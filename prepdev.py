@@ -671,7 +671,7 @@ def search_dependencies():
 
 
 def def_install_path():
-    default_dir = "~/repo"
+    default_dir = "~/repository"
     msg = Colors.WARNING
     msg += "Em qual diretório os códigos devem ficar? "
     msg += Colors.BLUE + "({}): ".format(default_dir) + Colors.ENDC
