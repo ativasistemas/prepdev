@@ -25,11 +25,14 @@ INTERPOLATION_VALUES = {
     }
 }
 POSITIVE_ANSWER = ["s", "S", "y", "Y", "sim", "Sim", "SIM"]
-
+LOCAL_REPOSITORY = ""
 VENV = ".sigmavenv"
+SIGMA_DIR = ""
+SIGMALIB_DIR = ""
+VENV_DIR = ""
+ACTIVATE_VENV = ""
 PIP_TIMEOUT = 60
 PIP_INSTALL_CMD = "pip install --timeout {} {{}}".format(PIP_TIMEOUT)
-ACTIVATE_VENV = "source {}/bin/activate;".format(VENV)
 HOME_DIR = os.path.expanduser("~")
 SSH_DIR = os.path.join(HOME_DIR, ".ssh")
 SSH_CONFIG = os.path.join(SSH_DIR, "config")
@@ -37,10 +40,9 @@ SIGMA_SSH_KEY = os.path.join(SSH_DIR, "id_rsa_sigma")
 SIGMALIB_SSH_KEY = os.path.join(SSH_DIR, "id_rsa_sigmalib")
 SIGMA_PUB_KEY = SIGMA_SSH_KEY + ".pub"
 SIGMALIB_PUB_KEY = SIGMALIB_SSH_KEY + ".pub"
-SIGMA_DIR = os.path.abspath(".")
-VENV_DIR = os.path.join(SIGMA_DIR, VENV)
 BASHRC = os.path.join(HOME_DIR, ".bashrc")
 REPO_URL_SIGMALIB = "git@sigmalib.github.com:ativasistemas/sigmalib.git"
+REPO_URL_SIGMA = "git@sigma.github.com:ativasistemas/sigma.git"
 INI_FILE = "/tmp/sigma.ini"
 MIN_POSTGRES_VERSION = [9, 4]
 PACKAGES = ["libncurses5-dev", "libxml2-dev", "libxslt1-dev",
@@ -194,18 +196,18 @@ def so_dependencies():
 
 def create_venv():
     print_info("Criando ambiente virtual...")
-    if not os.path.exists(VENV):
-        cmd = "virtualenv " + VENV + " -p python3"
+    if not os.path.exists(VENV_DIR):
+        cmd = "virtualenv " + VENV_DIR + " -p python3"
         call(cmd)
 
 
 def update_packages():
     print_info("Atualizando pip...")
-    cmd = "source {}/bin/activate;" + PIP_INSTALL_CMD.format("-U pip")
+    cmd = "{} {}".format(ACTIVATE_VENV, PIP_INSTALL_CMD.format("-U pip"))
     call(cmd)
 
     print_info("Atualizando setuptools.")
-    cmd = ACTIVATE_VENV + PIP_INSTALL_CMD.format("-U setuptools")
+    cmd = "{} {}".format(ACTIVATE_VENV, PIP_INSTALL_CMD.format("-U setuptools"))
     call(cmd)
 
 
@@ -213,10 +215,18 @@ def setup_develop():
     """
     Prepara o ambiente para rodar o sigma.
     """
-    print_info("Executando setup develop...")
-    cmd = ACTIVATE_VENV + "python setup.py develop"
+    print_info("Preparando virtualenv para ambiente de desenvolvimento...")
+    # sigma
+    cmd = "python {}/setup.py develop".format(SIGMA_DIR)
+    cmd = "{} {}".format(ACTIVATE_VENV, cmd)
     call(cmd)
-    cmd = ACTIVATE_VENV + "pip install -e .[test,dev]"
+    print_info("Instalando dependências de testes e desenvolvimento...")
+    pip_cmd = "cd {}; pip install -e .[test,dev]".format(SIGMA_DIR)
+    cmd = "{} {}".format(ACTIVATE_VENV, pip_cmd)
+    call(cmd)
+    # sigmalib
+    cmd = "python {}/setup.py develop".format(SIGMALIB_DIR)
+    cmd = "{} {}".format(ACTIVATE_VENV, cmd)
     call(cmd)
 
 
@@ -285,7 +295,8 @@ def _set_postgres_permissions():
 
 def prepare_database():
     if _database_exists() is True:
-        msg = "O banco de dados " + Colors.BOLD + "{}".format(DATABASE_NAME) + Colors.ENDC + Colors.WARNING + " já existe! Posso "
+        msg = "O banco de dados " + Colors.BOLD + "{}".format(DATABASE_NAME)
+        msg += Colors.ENDC + Colors.WARNING + " já existe! Posso "
         msg += "excluí-lo e criá-lo novamente?(s/" + Colors.BOLD + "[N]"
         msg += Colors.ENDC + Colors.WARNING + ")"
         answer = input(Colors.WARNING + msg + Colors.ENDC)
@@ -300,7 +311,7 @@ def prepare_database():
             _drop_group("gusuarios_do_sigma")
             _drop_group("gimportacao_sigma")
     else:
-        # Caso o banco não exista, precisamos garantir que os usuários sejam excluídos.
+        # Precisamos garantir que os usuários abaixo não existam.
         _drop_user("sigma_dba")
         _drop_user("sigma_importacao")
         _drop_user("u03491509408")
@@ -519,12 +530,26 @@ def github_configured():
     return configured
 
 
+def install_sigmalib():
+    msg = "Instalando sigmalib..."
+    print_info(msg)
+    cmd = ACTIVATE_VENV
+    cmd += "pip install git+ssh://git@github.com/gjcarneiro/python-jscrambler.git#egg=jscrambler-2.0b1;"
+    cmd += "pip install git+ssh://git@sigmalib.github.com/ativasistemas/sigmalib.git#egg=sigmalib-0.9.2"
+    call(cmd)
+
+
 def clone_sigmalib():
     msg = "Clonando sigmalib..."
     print_info(msg)
-    cmd = "git clone {} sigmalib_prepdev".format(REPO_URL_SIGMALIB)
+    cmd = "git clone {} {}".format(REPO_URL_SIGMALIB, SIGMALIB_DIR)
     call(cmd)
-    cmd = "ln -s sigmalib_prepdev/sigmalib ."
+
+
+def clone_sigma():
+    msg = "Clonando sigma..."
+    print_info(msg)
+    cmd = "git clone {} {}".format(REPO_URL_SIGMA, SIGMA_DIR)
     call(cmd)
 
 
@@ -532,25 +557,33 @@ def run_migrations():
     print_info("Executando migrações...")
     if _database_exists() is False:
         cmd = ACTIVATE_VENV
-        cmd += "python sigma/migrations/sprint_1.py {}".format(INI_FILE)
-        call(cmd, True)
-    cmd = ACTIVATE_VENV + "sigma_run_migrations -b {}".format(INI_FILE)
-    call(cmd, True)
+        cmd += "cd {}; python {}/sigma/migrations/sprint_1.py {}"
+        cmd = cmd.format(SIGMA_DIR, SIGMA_DIR, INI_FILE)
+        call(cmd)
+    cmd = ACTIVATE_VENV + "cd {}; sigma_run_migrations -b {}"
+    cmd = cmd.format(SIGMA_DIR, INI_FILE)
+    call(cmd)
 
 
 def make_commands():
-    sigma = "alias sigma='source {}/bin/activate; cd {}'"
-    sigma = sigma.format(VENV_DIR, SIGMA_DIR)
+    print_info("Criando comandos personalizados...")
+    sigma = "alias sigma='{} cd {}'\n"
+    sigma = sigma.format(ACTIVATE_VENV, SIGMA_DIR)
+    sigmalib = "alias sigmalib='{} cd {}'\n"
+    sigmalib = sigmalib.format(ACTIVATE_VENV, SIGMALIB_DIR)
     if os.path.exists(BASHRC) is True:
         with open(BASHRC, "r+") as f:
             # Se o alias ainda não foi criado. Crie-o.
             if sigma not in f.read():
                 f.write("# Alias criado pelo comando prepdev do sigma.\n")
                 f.write(sigma)
+            if sigmalib not in f.read():
+                f.write(sigmalib)
     else:
         with open(BASHRC, "w") as f:
             f.write("# Alias criado pelo comando prepdev do sigma.\n")
             f.write(sigma)
+            f.write(sigmalib)
 
 
 def pre_process_sql(filename):
@@ -578,7 +611,7 @@ def populate_db():
     if answer == "":
         answer = "s"
     if answer in POSITIVE_ANSWER:
-        sqls = os.path.abspath(".") + "/sigma/sql/dev"
+        sqls = os.path.join(SIGMA_DIR, "sigma", "sql", "dev")
         for files in reversed(list(os.walk(sqls, topdown=False))):
             # O comando walk retorna tuplas no seguinte formato [dirpath, dirnames, filenames]
             for sql in files[-1]:
@@ -607,7 +640,7 @@ def is_valid_postgresql_version():
                 int(ret[1]) >= MIN_POSTGRES_VERSION[1]))
 
 
-def shutdown_db():
+def close_connections():
     print_info("Derrubando conexões com o banco de dados.")
     call("psql -h localhost -U postgres -c {}".format(DISCONNECT_DB_COMMAND))
 
@@ -637,23 +670,53 @@ def search_dependencies():
         sys.exit(-1)
 
 
+def def_install_path():
+    default_dir = "~/repo"
+    msg = Colors.WARNING
+    msg += "Em qual diretório os códigos devem ficar? "
+    msg += Colors.BLUE + "({}): ".format(default_dir) + Colors.ENDC
+    answer = input(msg)
+
+    if not answer:
+        answer = default_dir
+
+    if "~" in answer:
+        answer = os.path.expanduser(answer)
+
+    global LOCAL_REPOSITORY
+    global SIGMA_DIR
+    global SIGMALIB_DIR
+    global VENV_DIR
+    global ACTIVATE_VENV
+
+    LOCAL_REPOSITORY = answer
+    SIGMA_DIR = os.path.join(LOCAL_REPOSITORY, "sigma")
+    SIGMALIB_DIR = os.path.join(LOCAL_REPOSITORY, "sigmalib")
+    VENV_DIR = os.path.join(LOCAL_REPOSITORY, VENV)
+    ACTIVATE_VENV = "source {}/bin/activate;".format(VENV_DIR)
+    os.makedirs(LOCAL_REPOSITORY, exist_ok=True)
+
+
 def run():
     if important_message() is True:
+        def_install_path()
         search_dependencies()
         create_ssh_keys()
         create_ssh_config()
         if github_configured() is False:
             sys.exit(-1)
+        clone_sigma()
         clone_sigmalib()
         so_dependencies()
         create_venv()
+        install_sigmalib()
         if is_valid_postgresql_version() is False:
             msg = Colors.FAIL + "Versão inválida do postgresql detectada."
             msg += Colors.GREEN + " Versão mínima aceita: {}.{}" + Colors.ENDC
             exit(msg.format(MIN_POSTGRES_VERSION[0], MIN_POSTGRES_VERSION[1]))
         update_packages()
         setup_develop()
-        shutdown_db()
+        close_connections()
         prepare_database()
         run_migrations()
         populate_db()
