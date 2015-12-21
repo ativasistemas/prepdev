@@ -30,9 +30,11 @@ VENV = ".sigmavenv"
 SIGMA_DIR = ""
 SIGMALIB_DIR = ""
 VENV_DIR = ""
-ACTIVATE_VENV = ""
+PYTHON = ""
+PIP = ""
 PIP_TIMEOUT = 60
-PIP_INSTALL_CMD = "pip install --timeout {} {{}}".format(PIP_TIMEOUT)
+PIP_INSTALL = ""
+ACTIVATE_VENV = ""
 HOME_DIR = os.path.expanduser("~")
 SSH_DIR = os.path.join(HOME_DIR, ".ssh")
 SSH_CONFIG = os.path.join(SSH_DIR, "config")
@@ -197,17 +199,17 @@ def so_dependencies():
 def create_venv():
     print_info("Criando ambiente virtual...")
     if not os.path.exists(VENV_DIR):
-        cmd = "virtualenv " + VENV_DIR + " -p python3"
-        call(cmd)
+        cmd = "virtualenv {} -p python3".format(VENV_DIR)
+        call(cmd, True)
 
 
 def update_packages():
     print_info("Atualizando pip...")
-    cmd = "{} {}".format(ACTIVATE_VENV, PIP_INSTALL_CMD.format("-U pip"))
+    cmd = "{}".format(PIP_INSTALL.format("-U pip"))
     call(cmd)
 
-    print_info("Atualizando setuptools.")
-    cmd = "{} {}".format(ACTIVATE_VENV, PIP_INSTALL_CMD.format("-U setuptools"))
+    print_info("Atualizando setuptools...")
+    cmd = "{}".format(PIP_INSTALL.format("-U setuptools"))
     call(cmd)
 
 
@@ -215,24 +217,27 @@ def setup_develop():
     """
     Prepara o ambiente para rodar o sigma.
     """
+    print("#" * 80)
     print_info("Preparando virtualenv para ambiente de desenvolvimento...")
     # sigma
-    cmd = "python {}/setup.py develop".format(SIGMA_DIR)
-    cmd = "{} {}".format(ACTIVATE_VENV, cmd)
-    call(cmd)
+    cmd = "cd {}; {} setup.py develop".format(SIGMA_DIR, PYTHON)
+    print("#" * 80)
+    print(cmd)
+    call(cmd, True)
+    print("#" * 80)
     print_info("Instalando dependências de testes e desenvolvimento...")
-    pip_cmd = "cd {}; pip install -e .[test,dev]".format(SIGMA_DIR)
-    cmd = "{} {}".format(ACTIVATE_VENV, pip_cmd)
-    call(cmd)
+    cmd = "cd {}; {} install -e .[test,dev]".format(SIGMA_DIR, PIP)
+    # cmd = "{} {}".format(ACTIVATE_VENV, pip_cmd)
+    call(cmd, True)
     # sigmalib
-    cmd = "python {}/setup.py develop".format(SIGMALIB_DIR)
-    cmd = "{} {}".format(ACTIVATE_VENV, cmd)
-    call(cmd)
+    # cmd = "cd {}; {} setup.py develop".format(SIGMALIB_DIR, PYTHON)
+    # # cmd = "{} {}".format(ACTIVATE_VENV, cmd)
+    # call(cmd, True)
 
 
 def _generate_environment():
     print_info("Gerando arquivo environment...")
-    cmd = "source {}/bin/activate; sigma_update_postgres_env".format(VENV)
+    cmd = "source {}/bin/activate; sigma_update_postgres_env".format(VENV_DIR)
     call(cmd)
 
 
@@ -533,9 +538,9 @@ def github_configured():
 def install_sigmalib():
     msg = "Instalando sigmalib..."
     print_info(msg)
-    cmd = ACTIVATE_VENV
-    cmd += "pip install git+ssh://git@github.com/gjcarneiro/python-jscrambler.git#egg=jscrambler-2.0b1;"
-    cmd += "pip install git+ssh://git@sigmalib.github.com/ativasistemas/sigmalib.git#egg=sigmalib-0.9.2"
+    cmd = PIP_INSTALL.format("git+ssh://git@github.com/gjcarneiro/python-jscrambler.git#egg=jscrambler-2.0b1")
+    call(cmd)
+    cmd = PIP_INSTALL.format("git+ssh://git@sigmalib.github.com/ativasistemas/sigmalib.git#egg=sigmalib-0.9.2")
     call(cmd)
 
 
@@ -557,12 +562,12 @@ def run_migrations():
     print_info("Executando migrações...")
     if _database_exists() is False:
         cmd = ACTIVATE_VENV
-        cmd += "cd {}; python {}/sigma/migrations/sprint_1.py {}"
-        cmd = cmd.format(SIGMA_DIR, SIGMA_DIR, INI_FILE)
-        call(cmd)
+        cmd += "cd {}; python sigma/migrations/sprint_1.py {};"
+        cmd = cmd.format(SIGMA_DIR, INI_FILE)
+        call(cmd, True)
     cmd = ACTIVATE_VENV + "cd {}; sigma_run_migrations -b {}"
     cmd = cmd.format(SIGMA_DIR, INI_FILE)
-    call(cmd)
+    call(cmd, True)
 
 
 def make_commands():
@@ -688,11 +693,17 @@ def def_install_path():
     global SIGMALIB_DIR
     global VENV_DIR
     global ACTIVATE_VENV
+    global PYTHON
+    global PIP
+    global PIP_INSTALL
 
     LOCAL_REPOSITORY = answer
     SIGMA_DIR = os.path.join(LOCAL_REPOSITORY, "sigma")
     SIGMALIB_DIR = os.path.join(LOCAL_REPOSITORY, "sigmalib")
     VENV_DIR = os.path.join(LOCAL_REPOSITORY, VENV)
+    PYTHON = "{}/bin/python".format(VENV_DIR)
+    PIP = "{}/bin/pip".format(VENV_DIR)
+    PIP_INSTALL = "{} install --timeout {} {{}}".format(PIP, PIP_TIMEOUT)
     ACTIVATE_VENV = "source {}/bin/activate;".format(VENV_DIR)
     os.makedirs(LOCAL_REPOSITORY, exist_ok=True)
 
@@ -700,6 +711,10 @@ def def_install_path():
 def run():
     if important_message() is True:
         def_install_path()
+        if is_valid_postgresql_version() is False:
+            msg = Colors.FAIL + "Versão inválida do postgresql detectada."
+            msg += Colors.GREEN + " Versão mínima aceita: {}.{}" + Colors.ENDC
+            exit(msg.format(MIN_POSTGRES_VERSION[0], MIN_POSTGRES_VERSION[1]))
         search_dependencies()
         create_ssh_keys()
         create_ssh_config()
@@ -709,13 +724,9 @@ def run():
         clone_sigmalib()
         so_dependencies()
         create_venv()
-        install_sigmalib()
-        if is_valid_postgresql_version() is False:
-            msg = Colors.FAIL + "Versão inválida do postgresql detectada."
-            msg += Colors.GREEN + " Versão mínima aceita: {}.{}" + Colors.ENDC
-            exit(msg.format(MIN_POSTGRES_VERSION[0], MIN_POSTGRES_VERSION[1]))
         update_packages()
         setup_develop()
+        install_sigmalib()
         close_connections()
         prepare_database()
         run_migrations()
