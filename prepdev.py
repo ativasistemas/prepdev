@@ -25,6 +25,11 @@ INTERPOLATION_VALUES = {
     }
 }
 
+
+class InvalidPostgresqlVersionError(Exception):
+    pass
+
+
 class Prepdev():
     POSITIVE_ANSWER = ["s", "S", "y", "Y", "sim", "Sim", "SIM"]
     LOCAL_REPOSITORY = ""
@@ -47,7 +52,7 @@ class Prepdev():
     BASHRC = os.path.join(HOME_DIR, ".bashrc")
     REPO_URL_SIGMALIB = "git@sigmalib.github.com:ativasistemas/sigmalib.git"
     REPO_URL_SIGMA = "git@sigma.github.com:ativasistemas/sigma.git"
-    MIN_POSTGRES_VERSION = [9, 4]
+    MIN_POSTGRES_VERSION = "9.4"
     PACKAGES = ["libncurses5-dev", "libxml2-dev", "libxslt1-dev",
                 "python3-dev", "libpq-dev",
                 "postgresql-plpython3-9.4", "python-virtualenv"]
@@ -208,10 +213,31 @@ class Prepdev():
         os.makedirs(self.LOCAL_REPOSITORY, exist_ok=True)
 
 
+    def check_postgresql_version(self):
+        """
+        Verifica se a versão do postgresql é válida.
+        """
+        cmd = ["bash", "-c"]
+        cmd.append("psql --version")
+        # Se o banco existir o script retorna "1".
+        ret = subprocess.check_output(cmd).decode("utf-8")
+        ret = ret.replace("psql", "").replace("(PostgreSQL)", "")
+        version = ret.replace("\n", "").strip()
+        major = version.split(".")[0]
+        minor = version.split(".")[1]
+
+        if all((int(major) >= int(self.MIN_POSTGRES_VERSION.split(".")[0]),
+                int(minor) >= int(self.MIN_POSTGRES_VERSION.split(".")[1]))) is False:
+            msg = "Instale o postgresql {} ou superior. Sua versão é: {}"
+            msg = msg.format(self.MIN_POSTGRES_VERSION, version)
+            raise InvalidPostgresqlVersionError(msg)
+
+
     def run(self):
         self.set_instalation_path()
         self.so_dependencies()
         self.create_venv()
+        self.check_postgresql_version()
 
 class Colors:
     HEADER = '\033[95m'
@@ -676,18 +702,6 @@ def postgres_warning():
     print(Colors.BLUE + "host    all             all             127.0.0.1/32            md5" + Colors.ENDC)
 
 
-def is_valid_postgresql_version():
-    cmd = ["bash", "-c"]
-    cmd.append("psql --version")
-    # Se o banco existir o script retorna "1".
-    ret = subprocess.check_output(cmd).decode("utf-8")
-    ret = ret.replace("psql", "").replace("(PostgreSQL)", "").replace("\n", "").strip()
-    ret = ret.split(".")
-
-    return all((int(ret[0]) >= MIN_POSTGRES_VERSION[0],
-                int(ret[1]) >= MIN_POSTGRES_VERSION[1]))
-
-
 def close_connections():
     print_info("Derrubando conexões com o banco de dados.")
     call("psql -h localhost -U postgres -c {}".format(DISCONNECT_DB_COMMAND))
@@ -753,4 +767,7 @@ def run():
 if __name__ == "__main__":
     # run()
     instance = Prepdev()
-    instance.run()
+    try:
+        instance.run()
+    except InvalidPostgresqlVersionError as exc:
+        print_warning(exc.args[0])
