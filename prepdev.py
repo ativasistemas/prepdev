@@ -602,6 +602,26 @@ class Prepdev():
         sql_temp.seek(0)
         return sql_temp.name
 
+    def make_commands(self):
+        print_info("Criando comandos personalizados...")
+        sigma = "alias sigma='{} cd {}'\n"
+        sigma = sigma.format(self.ACTIVATE_VENV, self.SIGMA_DIR)
+        sigmalib = "alias sigmalib='{} cd {}'\n"
+        sigmalib = sigmalib.format(self.ACTIVATE_VENV, self.SIGMALIB_DIR)
+        if os.path.exists(self.BASHRC) is True:
+            with open(self.BASHRC, "r+") as f:
+                # Se o alias ainda não foi criado. Crie-o.
+                if sigma not in f.read():
+                    f.write("# Alias criado pelo comando prepdev do sigma.\n")
+                    f.write(sigma)
+                if sigmalib not in f.read():
+                    f.write(sigmalib)
+        else:
+            with open(self.BASHRC, "w") as f:
+                f.write("# Alias criado pelo comando prepdev do sigma.\n")
+                f.write(sigma)
+                f.write(sigmalib)
+
     def run(self):
         self.set_instalation_path()
         self.check_postgresql_version()
@@ -620,6 +640,7 @@ class Prepdev():
         self.prepare_database()
         self.run_migrations()
         self.populate_db()
+        self.make_commands()
 
 class Colors:
     HEADER = '\033[95m'
@@ -707,27 +728,6 @@ def important_message():
     else:
         return False
 
-def make_commands():
-    print_info("Criando comandos personalizados...")
-    sigma = "alias sigma='{} cd {}'\n"
-    sigma = sigma.format(ACTIVATE_VENV, SIGMA_DIR)
-    sigmalib = "alias sigmalib='{} cd {}'\n"
-    sigmalib = sigmalib.format(ACTIVATE_VENV, SIGMALIB_DIR)
-    if os.path.exists(BASHRC) is True:
-        with open(BASHRC, "r+") as f:
-            # Se o alias ainda não foi criado. Crie-o.
-            if sigma not in f.read():
-                f.write("# Alias criado pelo comando prepdev do sigma.\n")
-                f.write(sigma)
-            if sigmalib not in f.read():
-                f.write(sigmalib)
-    else:
-        with open(BASHRC, "w") as f:
-            f.write("# Alias criado pelo comando prepdev do sigma.\n")
-            f.write(sigma)
-            f.write(sigmalib)
-
-
 def postgres_warning():
     print("{:#^80}".format("Atenção"))
     print_warning("As seguintes linhas devem estar presentes no pg_hba.conf" + Colors.BOLD + "(na mesma ordem)" + Colors.ENDC + Colors.WARNING + ":")
@@ -757,7 +757,7 @@ def run():
         # close_connections()
         # prepare_database()
         # run_migrations()
-        populate_db()
+        # populate_db()
         make_commands()
         finish()
         print_help()
