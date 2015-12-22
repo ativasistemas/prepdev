@@ -753,12 +753,12 @@ class Prepdev():
         if self.important_message() is True:
             self.set_instalation_path()
             self.check_postgresql_version()
-            self.so_dependencies()
             self.create_venv()
             self.search_dependencies()
             self.create_ssh_keys()
             self.create_ssh_config()
             self.github_configured()
+            self.so_dependencies()
             self.clone_sigma()
             self.clone_sigmalib()
             self.update_packages()
