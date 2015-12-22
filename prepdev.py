@@ -76,9 +76,9 @@ class Prepdev():
 
         # Variáveis que devem ser substituídas nos arquivos sql.
         self.VARIABLES = {"schema_cadastro": INTERPOLATION_VALUES["schemas"]["cadastro"],
-                     "schema_planejamento": INTERPOLATION_VALUES["schemas"]["planejamento"],
-                     "user_importacao": self.config["sigma:database:users:importacao"]["name"],
-                     "group_importacao": self.config["sigma:database:groups:importacao"]["name"]}
+                          "schema_planejamento": INTERPOLATION_VALUES["schemas"]["planejamento"],
+                          "user_importacao": self.config["sigma:database:users:importacao"]["name"],
+                          "group_importacao": self.config["sigma:database:groups:importacao"]["name"]}
 
         self.DISCONNECT_DB_COMMAND = "\"SELECT pg_terminate_backend(pid) FROM "
         self.DISCONNECT_DB_COMMAND += "pg_stat_get_activity(NULL::integer) WHERE datid=("
@@ -213,7 +213,8 @@ class Prepdev():
         self.VENV_DIR = os.path.join(self.LOCAL_REPOSITORY, self.VENV)
         self.PYTHON = "{}/bin/python".format(self.VENV_DIR)
         self.PIP = "{}/bin/pip".format(self.VENV_DIR)
-        self.PIP_INSTALL = "{} install --timeout {} {{}}".format(self.PIP,self.PIP_TIMEOUT)
+        self.PIP_INSTALL = "{} install --timeout {} {{}}"
+        self.PIP_INSTALL = self.PIP_INSTALL.format(self.PIP, self.PIP_TIMEOUT)
         self.ACTIVATE_VENV = "source {}/bin/activate;".format(self.VENV_DIR)
         os.makedirs(self.LOCAL_REPOSITORY, exist_ok=True)
 
@@ -229,9 +230,9 @@ class Prepdev():
         version = ret.replace("\n", "").strip()
         major = version.split(".")[0]
         minor = version.split(".")[1]
-
-        if all((int(major) >= int(self.MIN_POSTGRES_VERSION.split(".")[0]),
-                int(minor) >= int(self.MIN_POSTGRES_VERSION.split(".")[1]))) is False:
+        major = int(major) >= int(self.MIN_POSTGRES_VERSION.split(".")[0])
+        minor = int(minor) >= int(self.MIN_POSTGRES_VERSION.split(".")[1])
+        if all((major, minor)) is False:
             msg = "Instale o postgresql {} ou superior. Sua versão é: {}"
             msg = msg.format(self.MIN_POSTGRES_VERSION, version)
             raise InvalidPostgresqlVersionError(msg)
@@ -299,7 +300,8 @@ class Prepdev():
         sigma_keys = cmd.format(self.SIGMA_SSH_KEY + " " + self.SIGMA_PUB_KEY)
         call(sigma_keys)
 
-        sigmalib_keys = cmd.format(self.SIGMALIB_SSH_KEY + " " + self.SIGMALIB_PUB_KEY)
+        sigmalib_keys = self.SIGMALIB_SSH_KEY + " " + self.SIGMALIB_PUB_KEY
+        sigmalib_keys = cmd.format(sigmalib_keys)
         call(sigmalib_keys)
 
     def create_ssh_config(self):
@@ -319,10 +321,12 @@ class Prepdev():
             with open(self.SSH_CONFIG, "w+") as f:
                 msg = "Configurando ssh para o sigma."
                 print_info(msg)
-                f.write(ssh_config.format("sigma.github.com", self.SIGMA_SSH_KEY))
+                f.write(ssh_config.format("sigma.github.com",
+                                          self.SIGMA_SSH_KEY))
                 msg = "Configurando ssh para o sigmalib."
                 print_info(msg)
-                f.write(ssh_config.format("sigmalib.github.com", self.SIGMALIB_SSH_KEY))
+                f.write(ssh_config.format("sigmalib.github.com",
+                                          self.SIGMALIB_SSH_KEY))
         else:
             msg = "Verificando arquivo de configuração do ssh..."
             print_info(msg)
@@ -331,13 +335,15 @@ class Prepdev():
                     msg = "Configurando ssh para o sigma."
                     print_info(msg)
                     f.write("# Criado pelo comando prepdev do sigma.\n")
-                    f.write(ssh_config.format("sigma.github.com", self.SIGMA_SSH_KEY))
+                    f.write(ssh_config.format("sigma.github.com",
+                                              self.SIGMA_SSH_KEY))
                 f.seek(0)
                 if "Host sigmalib.github.com" not in f.read():
                     msg = "Configurando ssh para o sigmalib."
                     print_info(msg)
                     f.write("# Criado pelo comando prepdev do sigma.\n")
-                    f.write(ssh_config.format("sigmalib.github.com", self.SIGMALIB_SSH_KEY))
+                    f.write(ssh_config.format("sigmalib.github.com",
+                                              self.SIGMALIB_SSH_KEY))
         self.set_ssh_config_permissions()
 
     def github_sigma_configured(self):
@@ -380,7 +386,8 @@ class Prepdev():
         configured = True
 
         if self.github_sigma_configured() is False:
-            msg = "Configure o repositório do sigma para permitir acesso com a chave:"
+            msg = "Configure o repositório do sigma para permitir acesso "
+            msg += "com a chave:"
             print_warning(msg)
             msg = " chave sigma(copie todo conteúdo dentro deste bloco) "
             msg = "{:#^80}".format(msg)
@@ -391,7 +398,8 @@ class Prepdev():
             configured = False
 
         if self.github_sigmalib_configured() is False:
-            msg = "Configure o repositório do sigmalib para permitir acesso com a chave:"
+            msg = "Configure o repositório do sigmalib para permitir acesso "
+            msg += "com a chave:"
             print_warning(msg)
             msg = " chave sigmalib(copie todo conteúdo dentro deste bloco) "
             msg = "{:#^80}".format(msg)
@@ -420,11 +428,12 @@ class Prepdev():
 
     def update_packages(self):
         print_info("Atualizando pip...")
-        cmd = "{}".format(self.PIP_INSTALL.format("-U pip"))
+        print(self.PIP_INSTALL)
+        cmd = self.PIP_INSTALL.format("-U pip")
         call(cmd)
 
         print_info("Atualizando setuptools...")
-        cmd = "{}".format(self.PIP_INSTALL.format("-U setuptools"))
+        cmd = self.PIP_INSTALL.format("-U setuptools")
         call(cmd)
 
     def setup_develop(self):
@@ -442,7 +451,8 @@ class Prepdev():
         call(cmd)
 
         # sigmalib
-        cmd = "cd {}; {} setup.py develop".format(self.SIGMALIB_DIR, self.PYTHON)
+        cmd = "cd {}; {} setup.py develop".format(self.SIGMALIB_DIR,
+                                                  self.PYTHON)
         call(cmd)
 
     def install_sigmalib(self):
@@ -469,10 +479,11 @@ class Prepdev():
 
     def prepare_database(self):
         if self._database_exists() is True:
-            msg = "O banco de dados " + Colors.BOLD + "{}".format(self.DATABASE_NAME)
+            msg = "O banco de dados " + Colors.BOLD + "{}"
             msg += Colors.ENDC + Colors.WARNING + " já existe! Posso "
             msg += "excluí-lo e criá-lo novamente?(s/" + Colors.BOLD + "[N]"
             msg += Colors.ENDC + Colors.WARNING + ")"
+            msg = msg.format(self.DATABASE_NAME)
             answer = input(Colors.WARNING + msg + Colors.ENDC)
             if answer in self.POSITIVE_ANSWER:
                 self._drop_database()
@@ -507,7 +518,10 @@ class Prepdev():
 
     def _database_exists(self):
         cmd = ["bash", "-c"]
-        cmd.append("psql -h localhost -U postgres -lqt | cut -d \| -f 1 | grep -w {} | wc -l".format(self.DATABASE_NAME))
+        cmd_psql = "psql -h localhost -U postgres -lqt | cut -d \| -f 1 | "
+        cmd_psql += "grep -w {} | wc -l"
+        cmd_psql = cmd_psql.format(self.DATABASE_NAME)
+        cmd.append(cmd_psql)
         # Se o banco existir o script retorna "1".
         return "1" in str(subprocess.check_output(cmd))
 
@@ -518,18 +532,25 @@ class Prepdev():
 
     def _drop_user(self, username):
         username = username.strip()
-        print_info("Excluindo usuário " + Colors.BOLD + Colors.BLUE + "{}".format(username))
-        cmd = "dropuser -h localhost -U postgres --if-exists {}".format(username)
+        msg = "Excluindo usuário " + Colors.BOLD + Colors.BLUE + "{}"
+        msg = msg.format(username)
+        print_info(msg)
+        cmd = "dropuser -h localhost -U postgres --if-exists {}"
+        cmd = cmd.format(username)
         call(cmd)
 
     def _drop_group(self, groupname):
-        print_info("Excluindo grupo " + Colors.BOLD + Colors.BLUE + "{}".format(groupname))
-        cmd = "psql -h localhost -U postgres -c \"drop group if exists {}\"".format(groupname)
+        msg = "Excluindo grupo " + Colors.BOLD + Colors.BLUE + "{}"
+        msg = msg.format(groupname)
+        print_info(msg)
+        cmd = "psql -h localhost -U postgres -c \"drop group if exists {}\""
+        cmd = cmd.format(groupname)
         call(cmd)
 
     def _generate_environment(self):
         print_info("Gerando arquivo environment...")
-        cmd = "source {}/bin/activate; sigma_update_postgres_env".format(self.VENV_DIR)
+        cmd = "source {}/bin/activate; sigma_update_postgres_env"
+        cmd = cmd.format(self.VENV_DIR)
         call(cmd)
 
     def _copy_environment(self):
@@ -541,9 +562,9 @@ class Prepdev():
         """
         Adiciona o usuário postgres ao grupo do usuário atualmente logado.
 
-        Como o ambiente virtual é criado para o usuário logado, o postgres precisa
-        ser colocado no grupo deste usuário, caso contrário ele não conseguirá ter
-        acesso as bibliotecas do virtualenv.
+        Como o ambiente virtual é criado para o usuário logado, o postgres
+        precisa ser colocado no grupo deste usuário. Caso contrário ele não
+        conseguirá ter acesso as bibliotecas do virtualenv.
         """
         user = getpass.getuser()
         cmd = "sudo usermod -G {} -a postgres".format(user)
@@ -551,7 +572,8 @@ class Prepdev():
 
     def _set_postgres_password(self):
         print_info("Configurando senha do usuário postgres...")
-        cmd = "psql -h localhost -U postgres -c \"alter user postgres with encrypted password '123Abcde'\""
+        cmd = "psql -h localhost -U postgres -c \"alter user postgres with "
+        cmd += "encrypted password '123Abcde'\""
         call(cmd)
 
     def run_migrations(self):
@@ -561,20 +583,21 @@ class Prepdev():
             cmd = "cd {}; {} sigma/migrations/sprint_1.py {};"
             cmd = cmd.format(self.SIGMA_DIR, self.PYTHON, self.INI_FILE)
             call(cmd)
-        # cmd = self.ACTIVATE_VENV + "cd {}; sigma_run_migrations -b {}"
         cmd = self.ACTIVATE_VENV
-        cmd += "cd {}; sigma_run_migrations -b {}".format(self.SIGMA_DIR, self.INI_FILE)
+        cmd += "cd {}; sigma_run_migrations -b {}".format(self.SIGMA_DIR,
+                                                          self.INI_FILE)
         call(cmd)
 
     def populate_db(self):
-        msg = "Deseja carregar os dados de desenvolvimento no banco de dados? ([" + Colors.BOLD + "S]" + Colors.ENDC + Colors.WARNING + "/n)" + Colors.ENDC
+        msg = "Deseja carregar os dados de desenvolvimento no banco de dados? "
+        msg += "([" + Colors.BOLD + "S]" + Colors.ENDC + Colors.WARNING + "/n)"
+        msg += Colors.ENDC
         answer = input(Colors.WARNING + msg + Colors.ENDC)
         if answer == "":
             answer = "s"
         if answer in self.POSITIVE_ANSWER:
             sqls = os.path.join(self.SIGMA_DIR, "sigma", "sql", "dev")
             for files in reversed(list(os.walk(sqls, topdown=False))):
-                # O comando walk retorna tuplas no seguinte formato [dirpath, dirnames, filenames]
                 for sql in files[-1]:
                     if ".sql" in sql[-4:]:
                         sql_file = files[0] + "/" + sql
@@ -639,18 +662,30 @@ class Prepdev():
         print_blue(print_format.format(msg))
 
     def print_help(self):
-        print_warning(format_cmd_print("sigma_server", "Executa o servidor."))
-        print_warning(format_cmd_print("sigma_run_migrations", "Faz upgrade do banco de dados."))
-        print_warning(format_cmd_print("sigma_run_tests", "Executa os testes do sistema."))
-        print_warning(format_cmd_print("sigma_update_postgres_env", "Gera um novo arquivo environment."))
-        print_warning(format_cmd_print("sigma_update_settings", "Gera os arquivos development.ini e production.ini. Usa sigma.ini como base."))
-        print_warning(format_cmd_print("sigma_update_static", "Processa os arquivos estáticos da pasta static_full e os copia para a pasta static."))
-        print_warning(format_cmd_print("sigma", "Ativa o ambiente virtual do sigma e muda para o diretório do projeto."))
-        print_warning("Para entrar manualmente no ambiente virtual, use o comando:", end=" ")
-        msg = "source {}/bin/activate".format(VENV)
+        cmd, cmd_help = "sigma_server", "Executa o servidor."
+        print_warning(format_cmd_print(cmd, cmd_help))
+        cmd, cmd_help = "sigma_run_migrations", "Faz upgrade do banco de dados."
+        print_warning(format_cmd_print(cmd, cmd_help))
+        cmd, cmd_help = "sigma_run_tests", "Executa os testes do sistema."
+        print_warning(format_cmd_print(cmd, cmd_help))
+        cmd, cmd_help = "sigma_update_postgres_env", "Gera um novo arquivo de "
+        cmd_help += "ambiente para o postgresql."
+        print_warning(format_cmd_print(cmd, cmd_help))
+        cmd, cmd_help = "sigma_update_settings", "Gera os arquivos development."
+        cmd_help += "ini e production.ini. Usa sigma.ini como base."
+        print_warning(format_cmd_print(cmd, cmd_help))
+        cmd, cmd_help = "sigma_update_static", "Processa os arquivos estáticos "
+        cmd_help += "da pasta static_full e os copia para a pasta static."
+        print_warning(format_cmd_print(cmd, cmd_help))
+        cmd, cmd_help = "sigma", "Ativa o ambiente virtual do sigma e muda "
+        cmd_help += "para o diretório do projeto."
+        print_warning(format_cmd_print(cmd, cmd_help))
+        msg = "Para entrar manualmente no ambiente virtual, use o comando:"
+        print_warning(msg, end=" ")
+        msg = "source {}/bin/activate".format(self.VENV)
         print(Colors.BLUE + Colors.BOLD + msg + Colors.ENDC)
-        msg = "Caso o comando sigma não seja reconhecido, feche esse terminal "
-        msg += "e abra novamente."
+        msg = "Caso algum dos comandos acima não seja reconhecido, feche esse "
+        msg += "terminal e abra novamente."
         print_warning(Colors.BOLD + msg)
 
     def postgres_warning(self):
@@ -742,7 +777,6 @@ def format_cmd_print(cmd, help):
     return msg
 
 if __name__ == "__main__":
-    # run()
     instance = Prepdev()
     try:
         instance.run()
