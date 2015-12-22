@@ -24,133 +24,156 @@ INTERPOLATION_VALUES = {
         "group_users": "gusuarios_do_sigma"
     }
 }
-POSITIVE_ANSWER = ["s", "S", "y", "Y", "sim", "Sim", "SIM"]
-LOCAL_REPOSITORY = ""
-VENV = ".sigmavenv"
-SIGMA_DIR = ""
-SIGMALIB_DIR = ""
-VENV_DIR = ""
-PYTHON = ""
-PIP = ""
-PIP_TIMEOUT = 60
-PIP_INSTALL = ""
-ACTIVATE_VENV = ""
-HOME_DIR = os.path.expanduser("~")
-SSH_DIR = os.path.join(HOME_DIR, ".ssh")
-SSH_CONFIG = os.path.join(SSH_DIR, "config")
-SIGMA_SSH_KEY = os.path.join(SSH_DIR, "id_rsa_sigma")
-SIGMALIB_SSH_KEY = os.path.join(SSH_DIR, "id_rsa_sigmalib")
-SIGMA_PUB_KEY = SIGMA_SSH_KEY + ".pub"
-SIGMALIB_PUB_KEY = SIGMALIB_SSH_KEY + ".pub"
-BASHRC = os.path.join(HOME_DIR, ".bashrc")
-REPO_URL_SIGMALIB = "git@sigmalib.github.com:ativasistemas/sigmalib.git"
-REPO_URL_SIGMA = "git@sigma.github.com:ativasistemas/sigma.git"
-INI_FILE = "/tmp/sigma.ini"
-MIN_POSTGRES_VERSION = [9, 4]
-PACKAGES = ["libncurses5-dev", "libxml2-dev", "libxslt1-dev",
-            "python3-dev", "libpq-dev",
-            "postgresql-plpython3-9.4", "python-virtualenv"]
-# Alguns pacotes mudam de nome quando a arquitetura muda.
-# Aqui cuidamos desse detalhe.
-if platform.architecture()[0] == "64bit":
-    PACKAGES.append("lib32z1-dev")
-else:
-    PACKAGES.append("zlib1g-dev")
 
-# Cria o arquivo de configuração básico para criação do banco.
-with open(INI_FILE, "w") as config_file:
-    config = configparser.RawConfigParser()
-    section = "sigma:database"
-    config.add_section(section)
-    config.set(section, "host", "127.0.0.1")
-    config.set(section, "port", "5432")
-    config.set(section, "name", "sigma_db_dev")
-    section = "sigma:database:users:sigma_dba"
-    config.add_section(section)
-    config.set(section, "password", "cfth#z>?3C>CDu-yn5nzgpaPy5NzS\Ce")
+class Prepdev():
+    POSITIVE_ANSWER = ["s", "S", "y", "Y", "sim", "Sim", "SIM"]
+    LOCAL_REPOSITORY = ""
+    VENV = ".sigmavenv"
+    SIGMA_DIR = ""
+    SIGMALIB_DIR = ""
+    VENV_DIR = ""
+    PYTHON = ""
+    PIP = ""
+    PIP_TIMEOUT = 60
+    PIP_INSTALL = ""
+    ACTIVATE_VENV = ""
+    HOME_DIR = os.path.expanduser("~")
+    SSH_DIR = os.path.join(HOME_DIR, ".ssh")
+    SSH_CONFIG = os.path.join(SSH_DIR, "config")
+    SIGMA_SSH_KEY = os.path.join(SSH_DIR, "id_rsa_sigma")
+    SIGMALIB_SSH_KEY = os.path.join(SSH_DIR, "id_rsa_sigmalib")
+    SIGMA_PUB_KEY = SIGMA_SSH_KEY + ".pub"
+    SIGMALIB_PUB_KEY = SIGMALIB_SSH_KEY + ".pub"
+    BASHRC = os.path.join(HOME_DIR, ".bashrc")
+    REPO_URL_SIGMALIB = "git@sigmalib.github.com:ativasistemas/sigmalib.git"
+    REPO_URL_SIGMA = "git@sigma.github.com:ativasistemas/sigma.git"
+    MIN_POSTGRES_VERSION = [9, 4]
+    PACKAGES = ["libncurses5-dev", "libxml2-dev", "libxslt1-dev",
+                "python3-dev", "libpq-dev",
+                "postgresql-plpython3-9.4", "python-virtualenv"]
+    DATABASE_NAME = ""
 
-    section = "sigma:database:users:importacao"
-    config.add_section(section)
-    config.set(section, "name", "sigma_importacao")
-    config.set(section, "password", "tLfuuGHm98xqj9k8TB3AVA8R")
+    def __init__(self):
+        self._create_config_file("/tmp/sigma.ini")
+        # Alguns pacotes mudam de nome quando a arquitetura muda.
+        # Aqui cuidamos desse detalhe.
+        if platform.architecture()[0] == "64bit":
+            self.PACKAGES.append("lib32z1-dev")
+        else:
+            self.PACKAGES.append("zlib1g-dev")
 
-    section = "sigma:database:groups:importacao"
-    config.add_section(section)
-    config.set(section, "name", "gimportacao_sigma")
+        self.DATABASE_NAME = self.config["sigma:database"]["name"]
 
-    section = "sigma"
-    config.add_section(section)
-    config.set(section, "debug", "False")
+        # Variáveis que devem ser substituídas nos arquivos sql.
+        self.VARIABLES = {"schema_cadastro": INTERPOLATION_VALUES["schemas"]["cadastro"],
+                     "schema_planejamento": INTERPOLATION_VALUES["schemas"]["planejamento"],
+                     "user_importacao": self.config["sigma:database:users:importacao"]["name"],
+                     "group_importacao": self.config["sigma:database:groups:importacao"]["name"]}
 
-    section = "server:main"
-    config.add_section(section)
-    config.set(section, "use", "egg:waitress#main")
-    config.set(section, "host", "0.0.0.0")
-    config.set(section, "port", "6543")
+        self.DISCONNECT_DB_COMMAND = "\"SELECT pg_terminate_backend(pid) FROM "
+        self.DISCONNECT_DB_COMMAND += "pg_stat_get_activity(NULL::integer) WHERE datid=("
+        self.DISCONNECT_DB_COMMAND += "SELECT oid from pg_database where datname = '{}');\"".format(self.DATABASE_NAME)
 
-    section = "app:main"
-    config.add_section(section)
-    config.set(section, "use", "egg:sigma")
 
-    section = "loggers"
-    config.add_section(section)
-    config.set(section, "keys", "root, sigma, sigma.core.utils")
+    def _create_config_file(self, file_):
+        # Cria o arquivo de configuração básico para criação do banco.
+        with open(file_, "w") as config_file:
+            config = configparser.RawConfigParser()
+            section = "sigma:database"
+            config.add_section(section)
+            config.set(section, "host", "127.0.0.1")
+            config.set(section, "port", "5432")
+            config.set(section, "name", "sigma_db_dev")
+            section = "sigma:database:users:sigma_dba"
+            config.add_section(section)
+            config.set(section, "password", "cfth#z>?3C>CDu-yn5nzgpaPy5NzS\Ce")
 
-    section = "handlers"
-    config.add_section(section)
-    config.set(section, "keys", "console")
+            section = "sigma:database:users:importacao"
+            config.add_section(section)
+            config.set(section, "name", "sigma_importacao")
+            config.set(section, "password", "tLfuuGHm98xqj9k8TB3AVA8R")
 
-    section = "formatters"
-    config.add_section(section)
-    config.set(section, "keys", "generic, color")
+            section = "sigma:database:groups:importacao"
+            config.add_section(section)
+            config.set(section, "name", "gimportacao_sigma")
 
-    section = "logger_root"
-    config.add_section(section)
-    config.set(section, "level", "INFO")
-    config.set(section, "handlers", "console")
+            section = "sigma"
+            config.add_section(section)
+            config.set(section, "debug", "False")
 
-    section = "logger_sigma"
-    config.add_section(section)
-    config.set(section, "level", "INFO")
-    config.set(section, "qualname", "sigma")
-    config.set(section, "handlers", "")
+            section = "server:main"
+            config.add_section(section)
+            config.set(section, "use", "egg:waitress#main")
+            config.set(section, "host", "0.0.0.0")
+            config.set(section, "port", "6543")
 
-    section = "logger_sigma.core.utils"
-    config.add_section(section)
-    config.set(section, "level", "INFO")
-    config.set(section, "qualname", "sigma.core.utils")
-    config.set(section, "handlers", "")
+            section = "app:main"
+            config.add_section(section)
+            config.set(section, "use", "egg:sigma")
 
-    section = "handler_console"
-    config.add_section(section)
-    config.set(section, "class", "StreamHandler")
-    config.set(section, "args", "(sys.stderr,)")
-    config.set(section, "level", "NOTSET")
-    config.set(section, "formatter", "color")
+            section = "loggers"
+            config.add_section(section)
+            config.set(section, "keys", "root, sigma, sigma.core.utils")
 
-    section = "formatter_generic"
-    config.add_section(section)
-    config.set(section, "format", "%(asctime)s %(levelname)-5.5s [%(name)s][%(threadName)s] %(message)s")
+            section = "handlers"
+            config.add_section(section)
+            config.set(section, "keys", "console")
 
-    section = "formatter_color"
-    config.add_section(section)
-    config.set(section, "class", "colorlog.ColoredFormatter")
-    config.set(section, "format", "%(asctime)s %(log_color)s%(levelname)-5.5s%(reset)s %(bg_blue)s[%(name)s]%(reset)s %(message)s")
-    config.set(section, "datefmt", "%Y/%m/%d %H:%M:%S")
+            section = "formatters"
+            config.add_section(section)
+            config.set(section, "keys", "generic, color")
 
-    config.write(config_file)
-config = configparser.ConfigParser()
-config.read(INI_FILE)
-DATABASE_NAME = config["sigma:database"]["name"]
-# Variáveis que devem ser substituídas nos arquivos sql.
-VARIABLES = {"schema_cadastro": INTERPOLATION_VALUES["schemas"]["cadastro"],
-             "schema_planejamento": INTERPOLATION_VALUES["schemas"]["planejamento"],
-             "user_importacao": config["sigma:database:users:importacao"]["name"],
-             "group_importacao": config["sigma:database:groups:importacao"]["name"]}
+            section = "logger_root"
+            config.add_section(section)
+            config.set(section, "level", "INFO")
+            config.set(section, "handlers", "console")
 
-DISCONNECT_DB_COMMAND = "\"SELECT pg_terminate_backend(pid) FROM "
-DISCONNECT_DB_COMMAND += "pg_stat_get_activity(NULL::integer) WHERE datid=("
-DISCONNECT_DB_COMMAND += "SELECT oid from pg_database where datname = '{}');\"".format(DATABASE_NAME)
+            section = "logger_sigma"
+            config.add_section(section)
+            config.set(section, "level", "INFO")
+            config.set(section, "qualname", "sigma")
+            config.set(section, "handlers", "")
+
+            section = "logger_sigma.core.utils"
+            config.add_section(section)
+            config.set(section, "level", "INFO")
+            config.set(section, "qualname", "sigma.core.utils")
+            config.set(section, "handlers", "")
+
+            section = "handler_console"
+            config.add_section(section)
+            config.set(section, "class", "StreamHandler")
+            config.set(section, "args", "(sys.stderr,)")
+            config.set(section, "level", "NOTSET")
+            config.set(section, "formatter", "color")
+
+            section = "formatter_generic"
+            config.add_section(section)
+            config.set(section, "format", "%(asctime)s %(levelname)-5.5s [%(name)s][%(threadName)s] %(message)s")
+
+            section = "formatter_color"
+            config.add_section(section)
+            config.set(section, "class", "colorlog.ColoredFormatter")
+            config.set(section, "format", "%(asctime)s %(log_color)s%(levelname)-5.5s%(reset)s %(bg_blue)s[%(name)s]%(reset)s %(message)s")
+            config.set(section, "datefmt", "%Y/%m/%d %H:%M:%S")
+
+            config.write(config_file)
+
+        self.config = configparser.ConfigParser()
+        self.config.read(file_)
+
+    def so_dependencies(self):
+        """
+        Dependências a serem instaladas no S.O..
+        """
+        print_info("Instalando dependências do S.O...")
+        cmd = "sudo apt-get install -f -y"
+        for pkg in self.PACKAGES:
+            cmd += " {}".format(pkg)
+        call(cmd)
+
+    def run(self):
+        self.so_dependencies()
 
 class Colors:
     HEADER = '\033[95m'
@@ -183,17 +206,6 @@ def call(command, print_output=False):
             subprocess.call(cmd, stdout=fnull, stderr=subprocess.STDOUT)
     else:
         subprocess.call(cmd, stderr=subprocess.STDOUT)
-
-
-def so_dependencies():
-    """
-    Dependências a serem instaladas no S.O..
-    """
-    print_info("Instalando dependências do S.O...")
-    cmd = "sudo apt-get install -f -y"
-    for pkg in PACKAGES:
-        cmd += " {}".format(pkg)
-    call(cmd)
 
 
 def create_venv():
@@ -741,4 +753,6 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    # run()
+    instance = Prepdev()
+    instance.run()
