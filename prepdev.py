@@ -217,7 +217,6 @@ class Prepdev():
         self.ACTIVATE_VENV = "source {}/bin/activate;".format(self.VENV_DIR)
         os.makedirs(self.LOCAL_REPOSITORY, exist_ok=True)
 
-
     def check_postgresql_version(self):
         """
         Verifica se a versão do postgresql é válida.
@@ -654,27 +653,56 @@ class Prepdev():
         msg += "e abra novamente."
         print_warning(Colors.BOLD + msg)
 
+    def postgres_warning(self):
+        print("{:#^80}".format("Atenção"))
+        print_warning("As seguintes linhas devem estar presentes no pg_hba.conf" + Colors.BOLD + "(na mesma ordem)" + Colors.ENDC + Colors.WARNING + ":")
+        print(Colors.BLUE + "host    all             postgres        127.0.0.1/32            trust" + Colors.ENDC)
+        print(Colors.BLUE + "host    all             all             127.0.0.1/32            md5" + Colors.ENDC)
+
+    def important_message(self):
+        """
+        Mensagens importantes.
+        """
+        msg = Colors.WARNING
+        msg += "Você já configurou o postgresql para aceitar conexões do localhost"
+        msg += "(127.0.0.1) como confiáveis? (s/" + Colors.BOLD + "[N]"
+        msg += Colors.ENDC + Colors.WARNING + ")" + Colors.ENDC
+        answer = input(msg)
+        if answer == "":
+            answer = "n"
+        if answer in self.POSITIVE_ANSWER:
+            return True
+        else:
+            return False
+
     def run(self):
-        self.set_instalation_path()
-        self.check_postgresql_version()
-        self.so_dependencies()
-        self.create_venv()
-        self.search_dependencies()
-        self.create_ssh_keys()
-        self.create_ssh_config()
-        self.github_configured()
-        self.clone_sigma()
-        self.clone_sigmalib()
-        self.update_packages()
-        self.setup_develop()
-        self.install_sigmalib()
-        self.close_connections()
-        self.prepare_database()
-        self.run_migrations()
-        self.populate_db()
-        self.make_commands()
-        self.finish()
-        self.print_help()
+        if self.important_message() is True:
+            self.set_instalation_path()
+            self.check_postgresql_version()
+            self.so_dependencies()
+            self.create_venv()
+            self.search_dependencies()
+            self.create_ssh_keys()
+            self.create_ssh_config()
+            self.github_configured()
+            self.clone_sigma()
+            self.clone_sigmalib()
+            self.update_packages()
+            self.setup_develop()
+            self.install_sigmalib()
+            self.close_connections()
+            self.prepare_database()
+            self.run_migrations()
+            self.populate_db()
+            self.make_commands()
+            self.finish()
+            self.print_help()
+        else:
+            msg = "Configure o postgresql para aceitar conexões confiáveis "
+            msg += "vindas de localhost(" + Colors.BLUE + "/etc/postgresql/"
+            msg += "<version>/pg_hba.conf" + Colors.GREEN + ")."
+            print_warning(msg)
+            self.postgres_warning()
 
 class Colors:
     HEADER = '\033[95m'
@@ -712,62 +740,6 @@ def format_cmd_print(cmd, help):
     msg = Colors.BLUE + Colors.BOLD + cmd + Colors.ENDC + Colors.GREEN
     msg += " => " + help
     return msg
-
-
-def important_message():
-    """
-    Mensagens importantes.
-    """
-    msg = Colors.WARNING
-    msg += "Você já configurou o postgresql para aceitar conexões do localhost"
-    msg += "(127.0.0.1) como confiáveis? (s/" + Colors.BOLD + "[N]"
-    msg += Colors.ENDC + Colors.WARNING + ")" + Colors.ENDC
-    answer = input(msg)
-    if answer == "":
-        answer = "n"
-    if answer in POSITIVE_ANSWER:
-        return True
-    else:
-        return False
-
-def postgres_warning():
-    print("{:#^80}".format("Atenção"))
-    print_warning("As seguintes linhas devem estar presentes no pg_hba.conf" + Colors.BOLD + "(na mesma ordem)" + Colors.ENDC + Colors.WARNING + ":")
-    print(Colors.BLUE + "host    all             postgres        127.0.0.1/32            trust" + Colors.ENDC)
-    print(Colors.BLUE + "host    all             all             127.0.0.1/32            md5" + Colors.ENDC)
-
-
-def run():
-    if important_message() is True:
-        # def_install_path()
-        # if is_valid_postgresql_version() is False:
-        #     msg = Colors.FAIL + "Versão inválida do postgresql detectada."
-        #     msg += Colors.GREEN + " Versão mínima aceita: {}.{}" + Colors.ENDC
-        #     exit(msg.format(MIN_POSTGRES_VERSION[0], MIN_POSTGRES_VERSION[1]))
-        # search_dependencies()
-        # create_ssh_keys()
-        # create_ssh_config()
-        # if github_configured() is False:
-        #     sys.exit(-1)
-        # clone_sigma()
-        # clone_sigmalib()
-        # so_dependencies()
-        # create_venv()
-        # update_packages()
-        # setup_develop()
-        # install_sigmalib()
-        # close_connections()
-        # prepare_database()
-        # run_migrations()
-        # populate_db()
-        # make_commands()
-        # finish()
-        print_help()
-        postgres_warning()
-    else:
-        print_warning("Configure o postgresql para aceitar conexões confiáveis vindas de localhost(" + Colors.BLUE + "/etc/postgresql/<version>/pg_hba.conf" + Colors.GREEN + ").")
-        postgres_warning()
-
 
 if __name__ == "__main__":
     # run()
