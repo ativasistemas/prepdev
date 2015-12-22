@@ -567,6 +567,41 @@ class Prepdev():
         cmd += "cd {}; sigma_run_migrations -b {}".format(self.SIGMA_DIR, self.INI_FILE)
         call(cmd)
 
+    def populate_db(self):
+        msg = "Deseja carregar os dados de desenvolvimento no banco de dados? ([" + Colors.BOLD + "S]" + Colors.ENDC + Colors.WARNING + "/n)" + Colors.ENDC
+        answer = input(Colors.WARNING + msg + Colors.ENDC)
+        if answer == "":
+            answer = "s"
+        if answer in self.POSITIVE_ANSWER:
+            sqls = os.path.join(self.SIGMA_DIR, "sigma", "sql", "dev")
+            for files in reversed(list(os.walk(sqls, topdown=False))):
+                # O comando walk retorna tuplas no seguinte formato [dirpath, dirnames, filenames]
+                for sql in files[-1]:
+                    if ".sql" in sql[-4:]:
+                        sql_file = files[0] + "/" + sql
+                        sql_file = self._pre_process_sql(sql_file)
+                        cmd = "psql -h localhost -U postgres -d {} -f {}"
+                        cmd = cmd.format(self.DATABASE_NAME, sql_file)
+                        call(cmd)
+
+    def _pre_process_sql(self, filename):
+        """
+        Faz o pré-processamento do arquivo sql.
+
+        Durante o pré-processamento as {variáveis} informadas no arquivo são
+        substituídas.
+
+        Retorna o path do arquivo pré-processado.
+        """
+        sqls = None
+        with open(filename, "r") as sql_file:
+            sqls = sql_file.read()
+            sqls = sqls.format(**self.VARIABLES)
+        sql_temp = NamedTemporaryFile(delete=False)
+        sql_temp.write(bytes(sqls, 'utf-8'))
+        sql_temp.seek(0)
+        return sql_temp.name
+
     def run(self):
         self.set_instalation_path()
         self.check_postgresql_version()
@@ -584,6 +619,7 @@ class Prepdev():
         self.close_connections()
         self.prepare_database()
         self.run_migrations()
+        self.populate_db()
 
 class Colors:
     HEADER = '\033[95m'
@@ -692,41 +728,6 @@ def make_commands():
             f.write(sigmalib)
 
 
-def pre_process_sql(filename):
-    """
-    Faz o pré-processamento do arquivo sql.
-
-    Durante o pré-processamento as {variáveis} informadas no arquivo são
-    substituídas.
-
-    Retorna o path do arquivo pré-processado.
-    """
-    sqls = None
-    with open(filename, "r") as sql_file:
-        sqls = sql_file.read()
-        sqls = sqls.format(**VARIABLES)
-    sql_temp = NamedTemporaryFile(delete=False)
-    sql_temp.write(bytes(sqls, 'utf-8'))
-    sql_temp.seek(0)
-    return sql_temp.name
-
-
-def populate_db():
-    msg = "Deseja carregar os dados de desenvolvimento no banco de dados? ([" + Colors.BOLD + "S]" + Colors.ENDC + Colors.WARNING + "/n)" + Colors.ENDC
-    answer = input(Colors.WARNING + msg + Colors.ENDC)
-    if answer == "":
-        answer = "s"
-    if answer in POSITIVE_ANSWER:
-        sqls = os.path.join(SIGMA_DIR, "sigma", "sql", "dev")
-        for files in reversed(list(os.walk(sqls, topdown=False))):
-            # O comando walk retorna tuplas no seguinte formato [dirpath, dirnames, filenames]
-            for sql in files[-1]:
-                if ".sql" in sql[-4:]:
-                    sql_file = files[0] + "/" + sql
-                    sql_file = pre_process_sql(sql_file)
-                    call("psql -h localhost -U postgres -d {} -f {}".format(DATABASE_NAME, sql_file), True)
-
-
 def postgres_warning():
     print("{:#^80}".format("Atenção"))
     print_warning("As seguintes linhas devem estar presentes no pg_hba.conf" + Colors.BOLD + "(na mesma ordem)" + Colors.ENDC + Colors.WARNING + ":")
@@ -755,7 +756,7 @@ def run():
         # install_sigmalib()
         # close_connections()
         # prepare_database()
-        run_migrations()
+        # run_migrations()
         populate_db()
         make_commands()
         finish()
