@@ -427,6 +427,40 @@ class Prepdev():
         cmd = "{}".format(self.PIP_INSTALL.format("-U setuptools"))
         call(cmd)
 
+    def setup_develop(self):
+        """
+        Prepara o ambiente para rodar o sigma.
+        """
+        print_info("Preparando virtualenv para ambiente de desenvolvimento...")
+        # sigma
+        cmd = "cd {}; {} setup.py develop".format(self.SIGMA_DIR, self.PYTHON)
+        call(cmd)
+
+        # Dependências para testes e ferramentas de auxílio ao desenvolvimento.
+        cmd = "cd {}; {} install -e .[test,dev]".format(self.SIGMA_DIR,
+                                                        self.PIP)
+        call(cmd)
+
+        # sigmalib
+        cmd = "cd {}; {} setup.py develop".format(self.SIGMALIB_DIR, self.PYTHON)
+        call(cmd)
+
+    def install_sigmalib(self):
+        msg = "Instalando sigmalib..."
+        print_info(msg)
+
+        # jscrambler
+        url = "git+ssh://git@github.com/gjcarneiro/python-jscrambler.git"
+        url += "#egg=jscrambler-2.0b1"
+        cmd = self.PIP_INSTALL.format(url)
+        call(cmd)
+
+        # sigmalib
+        url = "git+ssh://git@sigmalib.github.com/ativasistemas/sigmalib.git"
+        url += "#egg=sigmalib-0.9.2"
+        cmd = self.PIP_INSTALL.format(url)
+        call(cmd)
+
     def run(self):
         self.set_instalation_path()
         self.check_postgresql_version()
@@ -439,6 +473,8 @@ class Prepdev():
         self.clone_sigma()
         self.clone_sigmalib()
         self.update_packages()
+        self.setup_develop()
+        self.install_sigmalib()
 
 class Colors:
     HEADER = '\033[95m'
@@ -471,28 +507,6 @@ def call(command, print_output=False):
             subprocess.call(cmd, stdout=fnull, stderr=subprocess.STDOUT)
     else:
         subprocess.call(cmd, stderr=subprocess.STDOUT)
-
-
-def setup_develop():
-    """
-    Prepara o ambiente para rodar o sigma.
-    """
-    print("#" * 80)
-    print_info("Preparando virtualenv para ambiente de desenvolvimento...")
-    # sigma
-    cmd = "cd {}; {} setup.py develop".format(SIGMA_DIR, PYTHON)
-    print("#" * 80)
-    print(cmd)
-    call(cmd, True)
-    print("#" * 80)
-    print_info("Instalando dependências de testes e desenvolvimento...")
-    cmd = "cd {}; {} install -e .[test,dev]".format(SIGMA_DIR, PIP)
-    # cmd = "{} {}".format(ACTIVATE_VENV, pip_cmd)
-    call(cmd, True)
-    # sigmalib
-    # cmd = "cd {}; {} setup.py develop".format(SIGMALIB_DIR, PYTHON)
-    # # cmd = "{} {}".format(ACTIVATE_VENV, cmd)
-    # call(cmd, True)
 
 
 def _generate_environment():
@@ -646,18 +660,6 @@ def important_message():
     else:
         return False
 
-
-
-
-def install_sigmalib():
-    msg = "Instalando sigmalib..."
-    print_info(msg)
-    cmd = PIP_INSTALL.format("git+ssh://git@github.com/gjcarneiro/python-jscrambler.git#egg=jscrambler-2.0b1")
-    call(cmd)
-    cmd = PIP_INSTALL.format("git+ssh://git@sigmalib.github.com/ativasistemas/sigmalib.git#egg=sigmalib-0.9.2")
-    call(cmd)
-
-
 def run_migrations():
     print_info("Executando migrações...")
     if _database_exists() is False:
@@ -755,8 +757,8 @@ def run():
         # clone_sigmalib()
         # so_dependencies()
         # create_venv()
-        update_packages()
-        setup_develop()
+        # update_packages()
+        # setup_develop()
         install_sigmalib()
         close_connections()
         prepare_database()
