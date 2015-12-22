@@ -232,12 +232,36 @@ class Prepdev():
             msg = msg.format(self.MIN_POSTGRES_VERSION, version)
             raise InvalidPostgresqlVersionError(msg)
 
+    def search_dependencies(self):
+        """
+        Verifica se as dependências estão disponíveis para instalação.
+        """
+        missing_packages = []
+        print_info("Verificando disponibilidade de pacotes...")
+        cache = apt.cache.Cache()
+        # cache.update() # Para usar este comando é preciso acesso root.
+        for pkg in PACKAGES:
+            try:
+                cache[pkg]
+            except KeyError:
+                missing_packages.append(pkg)
+        if missing_packages:
+            packages = ", ".join(missing_packages)
+            msg = "ATENÇÃO: O pacote(s) " + Colors.BLUE + "{}" + Colors.WARNING
+            msg += " não está(ão) disponível(is) em seu sistema."
+            msg = msg.format(packages)
+            print_warning(msg)
+            msg = "Verifique seus repositórios e atualize-o com:"
+            msg += " sudo apt-get update"
+            print_warning(msg)
+            sys.exit(-1)
 
     def run(self):
         self.set_instalation_path()
+        self.check_postgresql_version()
         self.so_dependencies()
         self.create_venv()
-        self.check_postgresql_version()
+        self.search_dependencies()
 
 class Colors:
     HEADER = '\033[95m'
@@ -707,38 +731,14 @@ def close_connections():
     call("psql -h localhost -U postgres -c {}".format(DISCONNECT_DB_COMMAND))
 
 
-def search_dependencies():
-    """
-    Verifica se as dependências estão disponíveis para instalação.
-    """
-    missing_packages = []
-    print_info("Verificando disponibilidade de pacotes...")
-    cache = apt.cache.Cache()
-    # cache.update() # Para usar este comando é preciso acesso root.
-    for pkg in PACKAGES:
-        try:
-            cache[pkg]
-        except KeyError:
-            missing_packages.append(pkg)
-    if missing_packages:
-        packages = ", ".join(missing_packages)
-        msg = "ATENÇÃO: O pacote(s) " + Colors.BLUE + "{}" + Colors.WARNING
-        msg += " não está(ão) disponível(is) em seu sistema."
-        msg = msg.format(packages)
-        print_warning(msg)
-        msg = "Verifique seus repositórios e atualize-o com:"
-        msg += " sudo apt-get update"
-        print_warning(msg)
-        sys.exit(-1)
-
 
 def run():
     if important_message() is True:
-        def_install_path()
-        if is_valid_postgresql_version() is False:
-            msg = Colors.FAIL + "Versão inválida do postgresql detectada."
-            msg += Colors.GREEN + " Versão mínima aceita: {}.{}" + Colors.ENDC
-            exit(msg.format(MIN_POSTGRES_VERSION[0], MIN_POSTGRES_VERSION[1]))
+        # def_install_path()
+        # if is_valid_postgresql_version() is False:
+        #     msg = Colors.FAIL + "Versão inválida do postgresql detectada."
+        #     msg += Colors.GREEN + " Versão mínima aceita: {}.{}" + Colors.ENDC
+        #     exit(msg.format(MIN_POSTGRES_VERSION[0], MIN_POSTGRES_VERSION[1]))
         search_dependencies()
         create_ssh_keys()
         create_ssh_config()
