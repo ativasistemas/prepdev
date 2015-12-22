@@ -467,6 +467,93 @@ class Prepdev():
         cmd += cmd.format(self.DISCONNECT_DB_COMMAND)
         call(cmd)
 
+    def prepare_database(self):
+        if self._database_exists() is True:
+            msg = "O banco de dados " + Colors.BOLD + "{}".format(self.DATABASE_NAME)
+            msg += Colors.ENDC + Colors.WARNING + " já existe! Posso "
+            msg += "excluí-lo e criá-lo novamente?(s/" + Colors.BOLD + "[N]"
+            msg += Colors.ENDC + Colors.WARNING + ")"
+            answer = input(Colors.WARNING + msg + Colors.ENDC)
+            if answer in self.POSITIVE_ANSWER:
+                self._drop_database()
+                self._drop_user("sigma_dba")
+                self._drop_user("sigma_importacao")
+                self._drop_user("u03491509408")
+                self._drop_user("u03455624456")
+                self._drop_user("u03895607401")
+                self._drop_group("gadministradores_do_sigma")
+                self._drop_group("gusuarios_do_sigma")
+                self._drop_group("gimportacao_sigma")
+        else:
+            # Precisamos garantir que os usuários abaixo não existam.
+            self._drop_user("sigma_dba")
+            self._drop_user("sigma_importacao")
+            self._drop_user("u03491509408")
+            self._drop_user("u03455624456")
+            self._drop_user("u03895607401")
+            self._drop_group("gadministradores_do_sigma")
+            self._drop_group("gusuarios_do_sigma")
+            self._drop_group("gimportacao_sigma")
+        self._generate_environment()
+        self._copy_environment()
+        self._set_postgres_permissions()
+        self._restart_database()
+        self._set_postgres_password()
+
+    def _restart_database(self):
+        print_info("Reiniciando banco de dados...")
+        cmd = "sudo service postgresql restart"
+        call(cmd)
+
+    def _database_exists(self):
+        cmd = ["bash", "-c"]
+        cmd.append("psql -h localhost -U postgres -lqt | cut -d \| -f 1 | grep -w {} | wc -l".format(self.DATABASE_NAME))
+        # Se o banco existir o script retorna "1".
+        return "1" in str(subprocess.check_output(cmd))
+
+    def _drop_database(self):
+        print_info("Excluindo banco de dados...")
+        cmd = "dropdb -h localhost -U postgres {}".format(self.DATABASE_NAME)
+        call(cmd)
+
+    def _drop_user(self, username):
+        username = username.strip()
+        print_info("Excluindo usuário " + Colors.BOLD + Colors.BLUE + "{}".format(username))
+        cmd = "dropuser -h localhost -U postgres --if-exists {}".format(username)
+        call(cmd)
+
+    def _drop_group(self, groupname):
+        print_info("Excluindo grupo " + Colors.BOLD + Colors.BLUE + "{}".format(groupname))
+        cmd = "psql -h localhost -U postgres -c \"drop group if exists {}\"".format(groupname)
+        call(cmd)
+
+    def _generate_environment(self):
+        print_info("Gerando arquivo environment...")
+        cmd = "source {}/bin/activate; sigma_update_postgres_env".format(self.VENV_DIR)
+        call(cmd)
+
+    def _copy_environment(self):
+        print_info("Copiando environment para o servidor de banco de dados...")
+        cmd = "sudo cp -f /tmp/environment /etc/postgresql/9.4/main/"
+        call(cmd)
+
+    def _set_postgres_permissions(self):
+        """
+        Adiciona o usuário postgres ao grupo do usuário atualmente logado.
+
+        Como o ambiente virtual é criado para o usuário logado, o postgres precisa
+        ser colocado no grupo deste usuário, caso contrário ele não conseguirá ter
+        acesso as bibliotecas do virtualenv.
+        """
+        user = getpass.getuser()
+        cmd = "sudo usermod -G {} -a postgres".format(user)
+        call(cmd)
+
+    def _set_postgres_password(self):
+        print_info("Configurando senha do usuário postgres...")
+        cmd = "psql -h localhost -U postgres -c \"alter user postgres with encrypted password '123Abcde'\""
+        call(cmd)
+
     def run(self):
         self.set_instalation_path()
         self.check_postgresql_version()
@@ -482,6 +569,7 @@ class Prepdev():
         self.setup_develop()
         self.install_sigmalib()
         self.close_connections()
+        self.prepare_database()
 
 class Colors:
     HEADER = '\033[95m'
@@ -514,104 +602,6 @@ def call(command, print_output=False):
             subprocess.call(cmd, stdout=fnull, stderr=subprocess.STDOUT)
     else:
         subprocess.call(cmd, stderr=subprocess.STDOUT)
-
-
-def _generate_environment():
-    print_info("Gerando arquivo environment...")
-    cmd = "source {}/bin/activate; sigma_update_postgres_env".format(VENV_DIR)
-    call(cmd)
-
-
-def _copy_environment():
-    print_info("Copiando environment para o servidor de banco de dados...")
-    cmd = "sudo cp -f /tmp/environment /etc/postgresql/9.4/main/"
-    call(cmd)
-
-
-def _restart_database():
-    print_info("Reiniciando banco de dados...")
-    cmd = "sudo service postgresql restart"
-    call(cmd)
-
-
-def _database_exists():
-    cmd = ["bash", "-c"]
-    cmd.append("psql -h localhost -U postgres -lqt | cut -d \| -f 1 | grep -w {} | wc -l".format(DATABASE_NAME))
-    # Se o banco existir o script retorna "1".
-    return "1" in str(subprocess.check_output(cmd))
-
-
-def _drop_database():
-    print_info("Excluindo banco de dados...")
-    cmd = "dropdb -h localhost -U postgres {}".format(DATABASE_NAME)
-    call(cmd)
-
-
-def _drop_user(username):
-    username = username.strip()
-    print_info("Excluindo usuário " + Colors.BOLD + Colors.BLUE + "{}".format(username))
-    cmd = "dropuser -h localhost -U postgres --if-exists {}".format(username)
-    call(cmd)
-
-
-def _drop_group(groupname):
-    print_info("Excluindo grupo " + Colors.BOLD + Colors.BLUE + "{}".format(groupname))
-    cmd = "psql -h localhost -U postgres -c \"drop group if exists {}\"".format(groupname)
-    call(cmd)
-
-
-def _set_postgres_password():
-    print_info("Configurando senha do usuário postgres...")
-    cmd = "psql -h localhost -U postgres -c \"alter user postgres with encrypted password '123Abcde'\""
-    call(cmd)
-
-
-def _set_postgres_permissions():
-    """
-    Adiciona o usuário postgres ao grupo do usuário atualmente logado.
-
-    Como o ambiente virtual é criado para o usuário logado, o postgres precisa
-    ser colocado no grupo deste usuário, caso contrário ele não conseguirá ter
-    acesso as bibliotecas do virtualenv.
-    """
-    user = getpass.getuser()
-    cmd = "sudo usermod -G {} -a postgres".format(user)
-    call(cmd)
-
-
-def prepare_database():
-    if _database_exists() is True:
-        msg = "O banco de dados " + Colors.BOLD + "{}".format(DATABASE_NAME)
-        msg += Colors.ENDC + Colors.WARNING + " já existe! Posso "
-        msg += "excluí-lo e criá-lo novamente?(s/" + Colors.BOLD + "[N]"
-        msg += Colors.ENDC + Colors.WARNING + ")"
-        answer = input(Colors.WARNING + msg + Colors.ENDC)
-        if answer in POSITIVE_ANSWER:
-            _drop_database()
-            _drop_user("sigma_dba")
-            _drop_user("sigma_importacao")
-            _drop_user("u03491509408")
-            _drop_user("u03455624456")
-            _drop_user("u03895607401")
-            _drop_group("gadministradores_do_sigma")
-            _drop_group("gusuarios_do_sigma")
-            _drop_group("gimportacao_sigma")
-    else:
-        # Precisamos garantir que os usuários abaixo não existam.
-        _drop_user("sigma_dba")
-        _drop_user("sigma_importacao")
-        _drop_user("u03491509408")
-        _drop_user("u03455624456")
-        _drop_user("u03895607401")
-        _drop_group("gadministradores_do_sigma")
-        _drop_group("gusuarios_do_sigma")
-        _drop_group("gimportacao_sigma")
-    _generate_environment()
-    _copy_environment()
-    _set_postgres_permissions()
-    _restart_database()
-    _set_postgres_password()
-
 
 def finish():
     print_format = "{:^80}"
@@ -761,7 +751,7 @@ def run():
         # update_packages()
         # setup_develop()
         # install_sigmalib()
-        close_connections()
+        # close_connections()
         prepare_database()
         run_migrations()
         populate_db()
