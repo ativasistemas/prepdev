@@ -418,6 +418,15 @@ class Prepdev():
         cmd = "git clone {} {}".format(self.REPO_URL_SIGMA, self.SIGMA_DIR)
         call(cmd)
 
+    def update_packages(self):
+        print_info("Atualizando pip...")
+        cmd = "{}".format(self.PIP_INSTALL.format("-U pip"))
+        call(cmd)
+
+        print_info("Atualizando setuptools...")
+        cmd = "{}".format(self.PIP_INSTALL.format("-U setuptools"))
+        call(cmd)
+
     def run(self):
         self.set_instalation_path()
         self.check_postgresql_version()
@@ -429,6 +438,7 @@ class Prepdev():
         self.github_configured()
         self.clone_sigma()
         self.clone_sigmalib()
+        self.update_packages()
 
 class Colors:
     HEADER = '\033[95m'
@@ -461,16 +471,6 @@ def call(command, print_output=False):
             subprocess.call(cmd, stdout=fnull, stderr=subprocess.STDOUT)
     else:
         subprocess.call(cmd, stderr=subprocess.STDOUT)
-
-
-def update_packages():
-    print_info("Atualizando pip...")
-    cmd = "{}".format(PIP_INSTALL.format("-U pip"))
-    call(cmd)
-
-    print_info("Atualizando setuptools...")
-    cmd = "{}".format(PIP_INSTALL.format("-U setuptools"))
-    call(cmd)
 
 
 def setup_develop():
@@ -751,10 +751,10 @@ def run():
         # create_ssh_config()
         # if github_configured() is False:
         #     sys.exit(-1)
-        clone_sigma()
-        clone_sigmalib()
-        so_dependencies()
-        create_venv()
+        # clone_sigma()
+        # clone_sigmalib()
+        # so_dependencies()
+        # create_venv()
         update_packages()
         setup_develop()
         install_sigmalib()
