@@ -57,13 +57,14 @@ class Prepdev():
     REPO_URL_SIGMALIB = "git@sigmalib.github.com:ativasistemas/sigmalib.git"
     REPO_URL_SIGMA = "git@sigma.github.com:ativasistemas/sigma.git"
     MIN_POSTGRES_VERSION = "9.4"
+    INI_FILE = "/tmp/sigma.ini"
     PACKAGES = ["libncurses5-dev", "libxml2-dev", "libxslt1-dev",
                 "python3-dev", "libpq-dev",
                 "postgresql-plpython3-9.4", "python-virtualenv"]
     DATABASE_NAME = ""
 
     def __init__(self):
-        self._create_config_file("/tmp/sigma.ini")
+        self._create_config_file(self.INI_FILE)
         # Alguns pacotes mudam de nome quando a arquitetura muda.
         # Aqui cuidamos desse detalhe.
         if platform.architecture()[0] == "64bit":
@@ -554,6 +555,18 @@ class Prepdev():
         cmd = "psql -h localhost -U postgres -c \"alter user postgres with encrypted password '123Abcde'\""
         call(cmd)
 
+    def run_migrations(self):
+        print_info("Executando migrações...")
+        if self._database_exists() is False:
+            # cmd = self.ACTIVATE_VENV
+            cmd = "cd {}; {} sigma/migrations/sprint_1.py {};"
+            cmd = cmd.format(self.SIGMA_DIR, self.PYTHON, self.INI_FILE)
+            call(cmd)
+        # cmd = self.ACTIVATE_VENV + "cd {}; sigma_run_migrations -b {}"
+        cmd = self.ACTIVATE_VENV
+        cmd += "cd {}; sigma_run_migrations -b {}".format(self.SIGMA_DIR, self.INI_FILE)
+        call(cmd)
+
     def run(self):
         self.set_instalation_path()
         self.check_postgresql_version()
@@ -570,6 +583,7 @@ class Prepdev():
         self.install_sigmalib()
         self.close_connections()
         self.prepare_database()
+        self.run_migrations()
 
 class Colors:
     HEADER = '\033[95m'
@@ -657,18 +671,6 @@ def important_message():
     else:
         return False
 
-def run_migrations():
-    print_info("Executando migrações...")
-    if _database_exists() is False:
-        cmd = ACTIVATE_VENV
-        cmd += "cd {}; python sigma/migrations/sprint_1.py {};"
-        cmd = cmd.format(SIGMA_DIR, INI_FILE)
-        call(cmd, True)
-    cmd = ACTIVATE_VENV + "cd {}; sigma_run_migrations -b {}"
-    cmd = cmd.format(SIGMA_DIR, INI_FILE)
-    call(cmd, True)
-
-
 def make_commands():
     print_info("Criando comandos personalizados...")
     sigma = "alias sigma='{} cd {}'\n"
@@ -752,7 +754,7 @@ def run():
         # setup_develop()
         # install_sigmalib()
         # close_connections()
-        prepare_database()
+        # prepare_database()
         run_migrations()
         populate_db()
         make_commands()
