@@ -461,6 +461,12 @@ class Prepdev():
         cmd = self.PIP_INSTALL.format(url)
         call(cmd)
 
+    def close_connections(self):
+        print_info("Derrubando conexões com o banco de dados.")
+        cmd = "psql -h localhost -U postgres -c {}"
+        cmd += cmd.format(self.DISCONNECT_DB_COMMAND)
+        call(cmd)
+
     def run(self):
         self.set_instalation_path()
         self.check_postgresql_version()
@@ -475,6 +481,7 @@ class Prepdev():
         self.update_packages()
         self.setup_develop()
         self.install_sigmalib()
+        self.close_connections()
 
 class Colors:
     HEADER = '\033[95m'
@@ -735,12 +742,6 @@ def postgres_warning():
     print(Colors.BLUE + "host    all             all             127.0.0.1/32            md5" + Colors.ENDC)
 
 
-def close_connections():
-    print_info("Derrubando conexões com o banco de dados.")
-    call("psql -h localhost -U postgres -c {}".format(DISCONNECT_DB_COMMAND))
-
-
-
 def run():
     if important_message() is True:
         # def_install_path()
@@ -759,7 +760,7 @@ def run():
         # create_venv()
         # update_packages()
         # setup_develop()
-        install_sigmalib()
+        # install_sigmalib()
         close_connections()
         prepare_database()
         run_migrations()
