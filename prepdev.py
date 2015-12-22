@@ -30,6 +30,10 @@ class InvalidPostgresqlVersionError(Exception):
     pass
 
 
+class GitHubNotConfiguredError(Exception):
+    pass
+
+
 class Prepdev():
     POSITIVE_ANSWER = ["s", "S", "y", "Y", "sim", "Sim", "SIM"]
     LOCAL_REPOSITORY = ""
@@ -336,6 +340,71 @@ class Prepdev():
                     f.write(ssh_config.format("sigmalib.github.com", self.SIGMALIB_SSH_KEY))
         self.set_ssh_config_permissions()
 
+    def github_sigma_configured(self):
+        """
+        Verifica se o github foi configurado com a chave do sigma.
+        """
+        ssh_sigma = "ssh -T git@sigma.github.com"
+        output = ""
+
+        with subprocess.Popen(ssh_sigma,
+                              shell=True,
+                              bufsize=255,
+                              stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE,
+                              close_fds=True) as ssh:
+            output = str(ssh.stderr.readlines()[0])
+
+        return "ativasistemas/sigma" in output
+
+
+    def github_sigmalib_configured(self):
+        """
+        Verifica se o github foi configurado com a chave do sigmalib.
+        """
+        ssh_sigmalib = "ssh -T git@sigmalib.github.com"
+
+        with subprocess.Popen(ssh_sigmalib,
+                              shell=True,
+                              bufsize=255,
+                              stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE,
+                              close_fds=True) as ssh:
+            output = str(ssh.stderr.readlines()[0])
+
+        return "ativasistemas/sigmalib" in output
+
+    def github_configured(self):
+        configured = True
+
+        if self.github_sigma_configured() is False:
+            msg = "Configure o repositório do sigma para permitir acesso com a chave:"
+            print_warning(msg)
+            msg = " chave sigma(copie todo conteúdo dentro deste bloco) "
+            msg = "{:#^80}".format(msg)
+            print_blue(msg)
+            call("cat {}".format(self.SIGMA_PUB_KEY), True)
+            msg = "{:#^80}".format("(fim do bloco)")
+            print_blue(msg)
+            configured = False
+
+        if self.github_sigmalib_configured() is False:
+            msg = "Configure o repositório do sigmalib para permitir acesso com a chave:"
+            print_warning(msg)
+            msg = " chave sigmalib(copie todo conteúdo dentro deste bloco) "
+            msg = "{:#^80}".format(msg)
+            print_blue(msg)
+            call("cat {}".format(self.SIGMALIB_PUB_KEY), True)
+            msg = "{:#^80}".format("(fim do bloco)")
+            print_blue(msg)
+            configured = False
+
+        if configured is False:
+            msg = "Acesse o github e permita o acesso para a(s) chave(s) acima."
+            raise GitHubNotConfiguredError(msg)
+
     def run(self):
         self.set_instalation_path()
         self.check_postgresql_version()
@@ -344,6 +413,7 @@ class Prepdev():
         self.search_dependencies()
         self.create_ssh_keys()
         self.create_ssh_config()
+        self.github_configured()
 
 class Colors:
     HEADER = '\033[95m'
@@ -562,69 +632,6 @@ def important_message():
         return False
 
 
-def github_sigma_configured():
-    """
-    Verifica se o github foi configurado com a chave do sigma.
-    """
-    ssh_sigma = "ssh -T git@sigma.github.com"
-    output = ""
-
-    with subprocess.Popen(ssh_sigma,
-                          shell=True,
-                          bufsize=255,
-                          stdin=subprocess.PIPE,
-                          stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE,
-                          close_fds=True) as ssh:
-        output = str(ssh.stderr.readlines()[0])
-
-    return "ativasistemas/sigma" in output
-
-
-def github_sigmalib_configured():
-    """
-    Verifica se o github foi configurado com a chave do sigmalib.
-    """
-    ssh_sigmalib = "ssh -T git@sigmalib.github.com"
-
-    with subprocess.Popen(ssh_sigmalib,
-                          shell=True,
-                          bufsize=255,
-                          stdin=subprocess.PIPE,
-                          stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE,
-                          close_fds=True) as ssh:
-        output = str(ssh.stderr.readlines()[0])
-
-    return "ativasistemas/sigmalib" in output
-
-
-def github_configured():
-    configured = True
-
-    if github_sigma_configured() is False:
-        msg = "Configure o repositório do sigma para permitir acesso com a chave:"
-        print_warning(msg)
-        msg = " chave sigma(copie todo conteúdo dentro deste bloco) "
-        msg = "{:#^80}".format(msg)
-        print_blue(msg)
-        call("cat {}".format(SIGMA_PUB_KEY), True)
-        msg = "{:#^80}".format("(fim do bloco)")
-        print_blue(msg)
-        configured = False
-
-    if github_sigmalib_configured() is False:
-        msg = "Configure o repositório do sigmalib para permitir acesso com a chave:"
-        print_warning(msg)
-        msg = " chave sigmalib(copie todo conteúdo dentro deste bloco) "
-        msg = "{:#^80}".format(msg)
-        print_blue(msg)
-        call("cat {}".format(SIGMALIB_PUB_KEY), True)
-        msg = "{:#^80}".format("(fim do bloco)")
-        print_blue(msg)
-        configured = False
-
-    return configured
 
 
 def install_sigmalib():
@@ -739,8 +746,8 @@ def run():
         #     msg += Colors.GREEN + " Versão mínima aceita: {}.{}" + Colors.ENDC
         #     exit(msg.format(MIN_POSTGRES_VERSION[0], MIN_POSTGRES_VERSION[1]))
         # search_dependencies()
-        create_ssh_keys()
-        create_ssh_config()
+        # create_ssh_keys()
+        # create_ssh_config()
         if github_configured() is False:
             sys.exit(-1)
         clone_sigma()
@@ -768,5 +775,5 @@ if __name__ == "__main__":
     instance = Prepdev()
     try:
         instance.run()
-    except InvalidPostgresqlVersionError as exc:
+    except Exception as exc:
         print_warning(exc.args[0])
