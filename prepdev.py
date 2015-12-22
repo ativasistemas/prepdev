@@ -164,7 +164,7 @@ class Prepdev():
 
     def so_dependencies(self):
         """
-        Dependências a serem instaladas no S.O..
+        Instala as dependências do S.O..
         """
         print_info("Instalando dependências do S.O...")
         cmd = "sudo apt-get install -f -y"
@@ -172,8 +172,46 @@ class Prepdev():
             cmd += " {}".format(pkg)
         call(cmd)
 
+    def create_venv(self):
+        """
+        Cria o amebiente virtual.
+        """
+        print_info("Criando ambiente virtual...")
+        if not os.path.exists(self.VENV_DIR):
+            cmd = "virtualenv {} -p python3".format(self.VENV_DIR)
+            call(cmd, True)
+
+    def set_instalation_path(self):
+        """
+        Solicita ao usuário o diretório onde o repositório será criado.
+        """
+        default_dir = "~/repository"
+        msg = Colors.WARNING
+        msg += "Em qual diretório os códigos devem ficar? "
+        msg += Colors.BLUE + "({}): ".format(default_dir) + Colors.ENDC
+        answer = input(msg)
+
+        if not answer:
+            answer = default_dir
+
+        if "~" in answer:
+            answer = os.path.expanduser(answer)
+
+        self.LOCAL_REPOSITORY = answer
+        self.SIGMA_DIR = os.path.join(self.LOCAL_REPOSITORY, "sigma")
+        self.SIGMALIB_DIR = os.path.join(self.LOCAL_REPOSITORY, "sigmalib")
+        self.VENV_DIR = os.path.join(self.LOCAL_REPOSITORY, self.VENV)
+        self.PYTHON = "{}/bin/python".format(self.VENV_DIR)
+        self.PIP = "{}/bin/pip".format(self.VENV_DIR)
+        self.PIP_INSTALL = "{} install --timeout {} {{}}".format(self.PIP,self.PIP_TIMEOUT)
+        self.ACTIVATE_VENV = "source {}/bin/activate;".format(self.VENV_DIR)
+        os.makedirs(self.LOCAL_REPOSITORY, exist_ok=True)
+
+
     def run(self):
+        self.set_instalation_path()
         self.so_dependencies()
+        self.create_venv()
 
 class Colors:
     HEADER = '\033[95m'
@@ -206,13 +244,6 @@ def call(command, print_output=False):
             subprocess.call(cmd, stdout=fnull, stderr=subprocess.STDOUT)
     else:
         subprocess.call(cmd, stderr=subprocess.STDOUT)
-
-
-def create_venv():
-    print_info("Criando ambiente virtual...")
-    if not os.path.exists(VENV_DIR):
-        cmd = "virtualenv {} -p python3".format(VENV_DIR)
-        call(cmd, True)
 
 
 def update_packages():
@@ -685,39 +716,6 @@ def search_dependencies():
         msg += " sudo apt-get update"
         print_warning(msg)
         sys.exit(-1)
-
-
-def def_install_path():
-    default_dir = "~/repository"
-    msg = Colors.WARNING
-    msg += "Em qual diretório os códigos devem ficar? "
-    msg += Colors.BLUE + "({}): ".format(default_dir) + Colors.ENDC
-    answer = input(msg)
-
-    if not answer:
-        answer = default_dir
-
-    if "~" in answer:
-        answer = os.path.expanduser(answer)
-
-    global LOCAL_REPOSITORY
-    global SIGMA_DIR
-    global SIGMALIB_DIR
-    global VENV_DIR
-    global ACTIVATE_VENV
-    global PYTHON
-    global PIP
-    global PIP_INSTALL
-
-    LOCAL_REPOSITORY = answer
-    SIGMA_DIR = os.path.join(LOCAL_REPOSITORY, "sigma")
-    SIGMALIB_DIR = os.path.join(LOCAL_REPOSITORY, "sigmalib")
-    VENV_DIR = os.path.join(LOCAL_REPOSITORY, VENV)
-    PYTHON = "{}/bin/python".format(VENV_DIR)
-    PIP = "{}/bin/pip".format(VENV_DIR)
-    PIP_INSTALL = "{} install --timeout {} {{}}".format(PIP, PIP_TIMEOUT)
-    ACTIVATE_VENV = "source {}/bin/activate;".format(VENV_DIR)
-    os.makedirs(LOCAL_REPOSITORY, exist_ok=True)
 
 
 def run():
