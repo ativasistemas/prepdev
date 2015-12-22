@@ -212,7 +212,7 @@ class Prepdev():
         print_info("Criando ambiente virtual...")
         if not os.path.exists(self.VENV_DIR):
             cmd = "virtualenv {} -p python3".format(self.VENV_DIR)
-            call(cmd, True)
+            call(cmd)
 
     def set_instalation_path(self):
         """
@@ -457,7 +457,6 @@ class Prepdev():
 
     def update_packages(self):
         print_info("Atualizando pip...")
-        print(self.PIP_INSTALL)
         cmd = self.PIP_INSTALL.format("-U pip")
         call(cmd)
 
@@ -655,25 +654,36 @@ class Prepdev():
 
     def make_commands(self):
         print_info("Criando comandos personalizados...")
-        sigma = "alias sigma='{} cd {}'\n"
-        sigma = sigma.format(self.ACTIVATE_VENV, self.SIGMA_DIR)
-        sigmalib = "alias sigmalib='{} cd {}'\n"
-        sigmalib = sigmalib.format(self.ACTIVATE_VENV, self.SIGMALIB_DIR)
         comment = "\n# Alias criado pelo comando prepdev do sigma.\n"
+        sigma = "alias sigma='{} cd {}'"
+        sigma = sigma.format(self.ACTIVATE_VENV, self.SIGMA_DIR)
+        sigmalib = "alias sigmalib='{} cd {}'"
+        sigmalib = sigmalib.format(self.ACTIVATE_VENV, self.SIGMALIB_DIR)
+        prepdev = "alias prepdev='{}/prepdev.py'".format(self.base_path)
         if os.path.exists(self.BASHRC) is True:
             with open(self.BASHRC, "r+") as f:
                 # Se o alias ainda não foi criado. Crie-o.
                 if sigma not in f.read():
                     f.write(comment)
                     f.write(sigma)
+                    f.write("\n")
                 f.seek(0)
                 if sigmalib not in f.read():
                     f.write(sigmalib)
+                    f.write("\n")
+                f.seek(0)
+                if prepdev not in f.read():
+                    f.write(prepdev)
+                    f.write("\n")
         else:
             with open(self.BASHRC, "w") as f:
                 f.write(comment)
                 f.write(sigma)
+                f.write("\n")
                 f.write(sigmalib)
+                f.write("\n")
+                f.write(prepdev)
+                f.write("\n")
 
     def finish(self):
         print_format = "{:^80}"
