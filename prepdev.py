@@ -240,7 +240,7 @@ class Prepdev():
         print_info("Verificando disponibilidade de pacotes...")
         cache = apt.cache.Cache()
         # cache.update() # Para usar este comando é preciso acesso root.
-        for pkg in PACKAGES:
+        for pkg in self.PACKAGES:
             try:
                 cache[pkg]
             except KeyError:
@@ -256,12 +256,94 @@ class Prepdev():
             print_warning(msg)
             sys.exit(-1)
 
+    def create_ssh_keys(self):
+        """
+        Cria(caso necessário) o par de chaves do sigma e sigmalib.
+        """
+        print_info("Verificando par de chaves...")
+        keygen_cmd = 'ssh-keygen -t rsa -N ""'
+
+        keygen_cmd_sigma = keygen_cmd
+        keygen_cmd_sigma += ' -f {}'.format(self.SIGMA_SSH_KEY)
+
+        keygen_cmd_sigmalib = keygen_cmd
+        keygen_cmd_sigmalib += ' -f {}'.format(self.SIGMALIB_SSH_KEY)
+
+        if os.path.exists(self.SIGMA_PUB_KEY) is False:
+            print_info("Criando par de chaves do sigma.")
+            call(keygen_cmd_sigma)
+
+        if os.path.exists(self.SIGMALIB_PUB_KEY) is False:
+            print_info("Criando par de chaves do sigmalib.")
+            call(keygen_cmd_sigmalib)
+
+    def set_ssh_config_permissions(self):
+        """
+        Ajusta as permissões do arquivo de configuração do ssh.
+
+        Caso as permissões não estejam corretas o ssh impede qualquer tipo de
+        conexão por questões de segurança.
+        """
+        msg = "Ajustando premissões dos arquivos do ssh"
+        print_info(msg)
+
+        cmd = "chmod u=rw,g-rwx,o-rwx {}"
+
+        ssh_config = cmd.format(self.SSH_CONFIG)
+        call(ssh_config)
+
+        sigma_keys = cmd.format(self.SIGMA_SSH_KEY + " " + self.SIGMA_PUB_KEY)
+        call(sigma_keys)
+
+        sigmalib_keys = cmd.format(self.SIGMALIB_SSH_KEY + " " + self.SIGMALIB_PUB_KEY)
+        call(sigmalib_keys)
+
+    def create_ssh_config(self):
+        """
+        Cria(caso necessário) a configuração do ssh para os repositórios.
+        """
+        ssh_config = """# Criado pelo comando prepdev do sigma.
+    Host {}
+        HostName github.com
+        User git
+        IdentityFile {}
+        StrictHostKeyChecking no
+    """
+        if os.path.exists(self.SSH_CONFIG) is False:
+            msg = "Criando arquivo de configuração do ssh..."
+            print_info(msg)
+            with open(self.SSH_CONFIG, "w+") as f:
+                msg = "Configurando ssh para o sigma."
+                print_info(msg)
+                f.write(ssh_config.format("sigma.github.com", self.SIGMA_SSH_KEY))
+                msg = "Configurando ssh para o sigmalib."
+                print_info(msg)
+                f.write(ssh_config.format("sigmalib.github.com", self.SIGMALIB_SSH_KEY))
+        else:
+            msg = "Verificando arquivo de configuração do ssh..."
+            print_info(msg)
+            with open(self.SSH_CONFIG, "r+") as f:
+                if "Host sigma.github.com" not in f.read():
+                    msg = "Configurando ssh para o sigma."
+                    print_info(msg)
+                    f.write("# Criado pelo comando prepdev do sigma.\n")
+                    f.write(ssh_config.format("sigma.github.com", self.SIGMA_SSH_KEY))
+                f.seek(0)
+                if "Host sigmalib.github.com" not in f.read():
+                    msg = "Configurando ssh para o sigmalib."
+                    print_info(msg)
+                    f.write("# Criado pelo comando prepdev do sigma.\n")
+                    f.write(ssh_config.format("sigmalib.github.com", self.SIGMALIB_SSH_KEY))
+        self.set_ssh_config_permissions()
+
     def run(self):
         self.set_instalation_path()
         self.check_postgresql_version()
         self.so_dependencies()
         self.create_venv()
         self.search_dependencies()
+        self.create_ssh_keys()
+        self.create_ssh_config()
 
 class Colors:
     HEADER = '\033[95m'
@@ -480,89 +562,6 @@ def important_message():
         return False
 
 
-def create_ssh_keys():
-    """
-    Cria(caso necessário) o par de chaves do sigma e sigmalib.
-    """
-    print_info("Verificando par de chaves...")
-    keygen_cmd = 'ssh-keygen -t rsa -N ""'
-
-    keygen_cmd_sigma = keygen_cmd
-    keygen_cmd_sigma += ' -f {}'.format(SIGMA_SSH_KEY)
-
-    keygen_cmd_sigmalib = keygen_cmd
-    keygen_cmd_sigmalib += ' -f {}'.format(SIGMALIB_SSH_KEY)
-
-    if os.path.exists(SIGMA_PUB_KEY) is False:
-        print_info("Criando par de chaves do sigma.")
-        call(keygen_cmd_sigma)
-
-    if os.path.exists(SIGMALIB_PUB_KEY) is False:
-        print_info("Criando par de chaves do sigmalib.")
-        call(keygen_cmd_sigmalib)
-
-
-def set_ssh_config_permissions():
-    """
-    Ajusta as permissões do arquivo de configuração do ssh.
-
-    Caso as permissões não estejam corretas o ssh impede qualquer tipo de
-    conexão por questões de segurança.
-    """
-    msg = "Ajustando premissões dos arquivos do ssh"
-    print_info(msg)
-
-    cmd = "chmod u=rw,g-rwx,o-rwx {}"
-
-    ssh_config = cmd.format(SSH_CONFIG)
-    call(ssh_config)
-
-    sigma_keys = cmd.format(SIGMA_SSH_KEY + " " + SIGMA_PUB_KEY)
-    call(sigma_keys)
-
-    sigmalib_keys = cmd.format(SIGMALIB_SSH_KEY + " " + SIGMALIB_PUB_KEY)
-    call(sigmalib_keys)
-
-
-def create_ssh_config():
-    """
-    Cria(caso necessário) a configuração do ssh para os repositórios.
-    """
-    ssh_config = """# Criado pelo comando prepdev do sigma.
-Host {}
-    HostName github.com
-    User git
-    IdentityFile {}
-    StrictHostKeyChecking no
-"""
-    if os.path.exists(SSH_CONFIG) is False:
-        msg = "Criando arquivo de configuração do ssh..."
-        print_info(msg)
-        with open(SSH_CONFIG, "w+") as f:
-            msg = "Configurando ssh para o sigma."
-            print_info(msg)
-            f.write(ssh_config.format("sigma.github.com", SIGMA_SSH_KEY))
-            msg = "Configurando ssh para o sigmalib."
-            print_info(msg)
-            f.write(ssh_config.format("sigmalib.github.com", SIGMALIB_SSH_KEY))
-    else:
-        msg = "Verificando arquivo de configuração do ssh..."
-        print_info(msg)
-        with open(SSH_CONFIG, "r+") as f:
-            if "Host sigma.github.com" not in f.read():
-                msg = "Configurando ssh para o sigma."
-                print_info(msg)
-                f.write("# Criado pelo comando prepdev do sigma.\n")
-                f.write(ssh_config.format("sigma.github.com", SIGMA_SSH_KEY))
-            f.seek(0)
-            if "Host sigmalib.github.com" not in f.read():
-                msg = "Configurando ssh para o sigmalib."
-                print_info(msg)
-                f.write("# Criado pelo comando prepdev do sigma.\n")
-                f.write(ssh_config.format("sigmalib.github.com", SIGMALIB_SSH_KEY))
-    set_ssh_config_permissions()
-
-
 def github_sigma_configured():
     """
     Verifica se o github foi configurado com a chave do sigma.
@@ -739,7 +738,7 @@ def run():
         #     msg = Colors.FAIL + "Versão inválida do postgresql detectada."
         #     msg += Colors.GREEN + " Versão mínima aceita: {}.{}" + Colors.ENDC
         #     exit(msg.format(MIN_POSTGRES_VERSION[0], MIN_POSTGRES_VERSION[1]))
-        search_dependencies()
+        # search_dependencies()
         create_ssh_keys()
         create_ssh_config()
         if github_configured() is False:
