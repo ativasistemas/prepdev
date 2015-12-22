@@ -614,6 +614,7 @@ class Prepdev():
                 if sigma not in f.read():
                     f.write("# Alias criado pelo comando prepdev do sigma.\n")
                     f.write(sigma)
+                f.seek(0)
                 if sigmalib not in f.read():
                     f.write(sigmalib)
         else:
@@ -624,22 +625,22 @@ class Prepdev():
 
     def run(self):
         self.set_instalation_path()
-        self.check_postgresql_version()
-        self.so_dependencies()
-        self.create_venv()
-        self.search_dependencies()
-        self.create_ssh_keys()
-        self.create_ssh_config()
-        self.github_configured()
-        self.clone_sigma()
-        self.clone_sigmalib()
-        self.update_packages()
-        self.setup_develop()
-        self.install_sigmalib()
-        self.close_connections()
-        self.prepare_database()
-        self.run_migrations()
-        self.populate_db()
+        # self.check_postgresql_version()
+        # self.so_dependencies()
+        # self.create_venv()
+        # self.search_dependencies()
+        # self.create_ssh_keys()
+        # self.create_ssh_config()
+        # self.github_configured()
+        # self.clone_sigma()
+        # self.clone_sigmalib()
+        # self.update_packages()
+        # self.setup_develop()
+        # self.install_sigmalib()
+        # self.close_connections()
+        # self.prepare_database()
+        # self.run_migrations()
+        # self.populate_db()
         self.make_commands()
 
 class Colors:
