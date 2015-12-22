@@ -608,18 +608,19 @@ class Prepdev():
         sigma = sigma.format(self.ACTIVATE_VENV, self.SIGMA_DIR)
         sigmalib = "alias sigmalib='{} cd {}'\n"
         sigmalib = sigmalib.format(self.ACTIVATE_VENV, self.SIGMALIB_DIR)
+        comment = "\n# Alias criado pelo comando prepdev do sigma.\n"
         if os.path.exists(self.BASHRC) is True:
             with open(self.BASHRC, "r+") as f:
                 # Se o alias ainda não foi criado. Crie-o.
                 if sigma not in f.read():
-                    f.write("# Alias criado pelo comando prepdev do sigma.\n")
+                    f.write(comment)
                     f.write(sigma)
                 f.seek(0)
                 if sigmalib not in f.read():
                     f.write(sigmalib)
         else:
             with open(self.BASHRC, "w") as f:
-                f.write("# Alias criado pelo comando prepdev do sigma.\n")
+                f.write(comment)
                 f.write(sigma)
                 f.write(sigmalib)
 
