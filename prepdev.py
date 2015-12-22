@@ -624,6 +624,21 @@ class Prepdev():
                 f.write(sigma)
                 f.write(sigmalib)
 
+    def finish(self):
+        print_format = "{:^80}"
+        msg = "██████╗██╗ ██████╗ ███╗   ███╗ █████╗"
+        print_blue(print_format.format(msg))
+        msg = "██╔════╝██║██╔════╝ ████╗ ████║██╔══██╗"
+        print_blue(print_format.format(msg))
+        msg = "███████╗██║██║  ███╗██╔████╔██║███████║"
+        print_blue(print_format.format(msg))
+        msg = "╚════██║██║██║   ██║██║╚██╔╝██║██╔══██║"
+        print_blue(print_format.format(msg))
+        msg = "███████║██║╚██████╔╝██║ ╚═╝ ██║██║  ██║"
+        print_blue(print_format.format(msg))
+        msg = "╚══════╝╚═╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝"
+        print_blue(print_format.format(msg))
+
     def run(self):
         self.set_instalation_path()
         self.check_postgresql_version()
@@ -643,6 +658,7 @@ class Prepdev():
         self.run_migrations()
         self.populate_db()
         self.make_commands()
+        self.finish()
 
 class Colors:
     HEADER = '\033[95m'
@@ -675,22 +691,6 @@ def call(command, print_output=False):
             subprocess.call(cmd, stdout=fnull, stderr=subprocess.STDOUT)
     else:
         subprocess.call(cmd, stderr=subprocess.STDOUT)
-
-def finish():
-    print_format = "{:^80}"
-    msg = "██████╗██╗ ██████╗ ███╗   ███╗ █████╗"
-    print_blue(print_format.format(msg))
-    msg = "██╔════╝██║██╔════╝ ████╗ ████║██╔══██╗"
-    print_blue(print_format.format(msg))
-    msg = "███████╗██║██║  ███╗██╔████╔██║███████║"
-    print_blue(print_format.format(msg))
-    msg = "╚════██║██║██║   ██║██║╚██╔╝██║██╔══██║"
-    print_blue(print_format.format(msg))
-    msg = "███████║██║╚██████╔╝██║ ╚═╝ ██║██║  ██║"
-    print_blue(print_format.format(msg))
-    msg = "╚══════╝╚═╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝"
-    print_blue(print_format.format(msg))
-
 
 def format_cmd_print(cmd, help):
     msg = Colors.BLUE + Colors.BOLD + cmd + Colors.ENDC + Colors.GREEN
@@ -760,7 +760,7 @@ def run():
         # prepare_database()
         # run_migrations()
         # populate_db()
-        make_commands()
+        # make_commands()
         finish()
         print_help()
         postgres_warning()
