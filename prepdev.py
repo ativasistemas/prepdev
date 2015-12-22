@@ -639,6 +639,21 @@ class Prepdev():
         msg = "╚══════╝╚═╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝"
         print_blue(print_format.format(msg))
 
+    def print_help(self):
+        print_warning(format_cmd_print("sigma_server", "Executa o servidor."))
+        print_warning(format_cmd_print("sigma_run_migrations", "Faz upgrade do banco de dados."))
+        print_warning(format_cmd_print("sigma_run_tests", "Executa os testes do sistema."))
+        print_warning(format_cmd_print("sigma_update_postgres_env", "Gera um novo arquivo environment."))
+        print_warning(format_cmd_print("sigma_update_settings", "Gera os arquivos development.ini e production.ini. Usa sigma.ini como base."))
+        print_warning(format_cmd_print("sigma_update_static", "Processa os arquivos estáticos da pasta static_full e os copia para a pasta static."))
+        print_warning(format_cmd_print("sigma", "Ativa o ambiente virtual do sigma e muda para o diretório do projeto."))
+        print_warning("Para entrar manualmente no ambiente virtual, use o comando:", end=" ")
+        msg = "source {}/bin/activate".format(VENV)
+        print(Colors.BLUE + Colors.BOLD + msg + Colors.ENDC)
+        msg = "Caso o comando sigma não seja reconhecido, feche esse terminal "
+        msg += "e abra novamente."
+        print_warning(Colors.BOLD + msg)
+
     def run(self):
         self.set_instalation_path()
         self.check_postgresql_version()
@@ -659,6 +674,7 @@ class Prepdev():
         self.populate_db()
         self.make_commands()
         self.finish()
+        self.print_help()
 
 class Colors:
     HEADER = '\033[95m'
@@ -696,22 +712,6 @@ def format_cmd_print(cmd, help):
     msg = Colors.BLUE + Colors.BOLD + cmd + Colors.ENDC + Colors.GREEN
     msg += " => " + help
     return msg
-
-
-def print_help():
-    print_warning(format_cmd_print("sigma_server", "Executa o servidor."))
-    print_warning(format_cmd_print("sigma_run_migrations", "Faz upgrade do banco de dados."))
-    print_warning(format_cmd_print("sigma_run_tests", "Executa os testes do sistema."))
-    print_warning(format_cmd_print("sigma_update_postgres_env", "Gera um novo arquivo environment."))
-    print_warning(format_cmd_print("sigma_update_settings", "Gera os arquivos development.ini e production.ini. Usa sigma.ini como base."))
-    print_warning(format_cmd_print("sigma_update_static", "Processa os arquivos estáticos da pasta static_full e os copia para a pasta static."))
-    print_warning(format_cmd_print("sigma", "Ativa o ambiente virtual do sigma e muda para o diretório do projeto."))
-    print_warning("Para entrar manualmente no ambiente virtual, use o comando:", end=" ")
-    msg = "source {}/bin/activate".format(VENV)
-    print(Colors.BLUE + Colors.BOLD + msg + Colors.ENDC)
-    msg = "Caso o comando sigma não seja reconhecido, feche esse terminal e "
-    msg += "abra novamente."
-    print_warning(Colors.BOLD + msg)
 
 
 def important_message():
@@ -761,7 +761,7 @@ def run():
         # run_migrations()
         # populate_db()
         # make_commands()
-        finish()
+        # finish()
         print_help()
         postgres_warning()
     else:
