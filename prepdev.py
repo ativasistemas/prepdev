@@ -405,6 +405,19 @@ class Prepdev():
             msg = "Acesse o github e permita o acesso para a(s) chave(s) acima."
             raise GitHubNotConfiguredError(msg)
 
+    def clone_sigmalib(self):
+        msg = "Clonando sigmalib..."
+        print_info(msg)
+        cmd = "git clone {} {}".format(self.REPO_URL_SIGMALIB,
+                                       self.SIGMALIB_DIR)
+        call(cmd)
+
+    def clone_sigma(self):
+        msg = "Clonando sigma..."
+        print_info(msg)
+        cmd = "git clone {} {}".format(self.REPO_URL_SIGMA, self.SIGMA_DIR)
+        call(cmd)
+
     def run(self):
         self.set_instalation_path()
         self.check_postgresql_version()
@@ -414,6 +427,8 @@ class Prepdev():
         self.create_ssh_keys()
         self.create_ssh_config()
         self.github_configured()
+        self.clone_sigma()
+        self.clone_sigmalib()
 
 class Colors:
     HEADER = '\033[95m'
@@ -643,20 +658,6 @@ def install_sigmalib():
     call(cmd)
 
 
-def clone_sigmalib():
-    msg = "Clonando sigmalib..."
-    print_info(msg)
-    cmd = "git clone {} {}".format(REPO_URL_SIGMALIB, SIGMALIB_DIR)
-    call(cmd)
-
-
-def clone_sigma():
-    msg = "Clonando sigma..."
-    print_info(msg)
-    cmd = "git clone {} {}".format(REPO_URL_SIGMA, SIGMA_DIR)
-    call(cmd)
-
-
 def run_migrations():
     print_info("Executando migrações...")
     if _database_exists() is False:
@@ -748,8 +749,8 @@ def run():
         # search_dependencies()
         # create_ssh_keys()
         # create_ssh_config()
-        if github_configured() is False:
-            sys.exit(-1)
+        # if github_configured() is False:
+        #     sys.exit(-1)
         clone_sigma()
         clone_sigmalib()
         so_dependencies()
