@@ -64,6 +64,8 @@ class Prepdev():
     DATABASE_NAME = ""
 
     def __init__(self):
+        self.base_path = os.path.dirname(os.path.abspath(__file__))
+        self.prepdevrc = os.path.join(self.base_path, ".prepdevrc")
         self._create_config_file(self.INI_FILE)
         # Alguns pacotes mudam de nome quando a arquitetura muda.
         # Aqui cuidamos desse detalhe.
@@ -84,6 +86,27 @@ class Prepdev():
         self.DISCONNECT_DB_COMMAND += "pg_stat_get_activity(NULL::integer) WHERE datid=("
         self.DISCONNECT_DB_COMMAND += "SELECT oid from pg_database where datname = '{}');\"".format(self.DATABASE_NAME)
 
+    def write_config(self, name, value, section="default"):
+        """
+        Grava o parâmetro do prepdev no arquivo de configuração.
+        """
+        with open(self.prepdevrc, "w") as config_file:
+            config = configparser.RawConfigParser()
+            config.add_section(section)
+            config.set(section, name, value)
+            config.write(config_file)
+
+    def read_config(self, name, section="default"):
+        """
+        Lê o parâmetro do arquivo de configuração do prepdev.
+        """
+        if os.path.exists(self.prepdevrc) is True:
+            config = configparser.RawConfigParser()
+            config.read(self.prepdevrc)
+            if section in config:
+                if name in config[section]:
+                    return config[section][name]
+        return ""
 
     def _create_config_file(self, file_):
         # Cria o arquivo de configuração básico para criação do banco.
@@ -195,7 +218,11 @@ class Prepdev():
         """
         Solicita ao usuário o diretório onde o repositório será criado.
         """
-        default_dir = "~/repository"
+        section = "repository_path"
+        default_dir = os.path.expanduser("~/repository")
+        repository_path = self.read_config("repository_path")
+        default_dir = repository_path or default_dir
+
         msg = Colors.WARNING
         msg += "Em qual diretório os códigos devem ficar? "
         msg += Colors.BLUE + "({}): ".format(default_dir) + Colors.ENDC
@@ -206,6 +233,8 @@ class Prepdev():
 
         if "~" in answer:
             answer = os.path.expanduser(answer)
+
+        self.write_config(section, answer)
 
         self.LOCAL_REPOSITORY = answer
         self.SIGMA_DIR = os.path.join(self.LOCAL_REPOSITORY, "sigma")
