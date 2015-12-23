@@ -74,13 +74,18 @@ class Prepdev():
     postgres_version = ""
     postgres_pghba = ""
 
-    def __init__(self, resetdb=False, excludedb=False, close_connections=False):
+    def __init__(self,
+                 resetdb=False,
+                 excludedb=False,
+                 close_connections=False,
+                 repository_path=""):
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.prepdevrc = os.path.join(self.base_path, ".prepdevrc")
         self._create_config_file(self.ini_file)
         self.resetdb = resetdb
         self.excludedb = excludedb
         self.close_connections = close_connections
+        self.repository_path = repository_path
         # Alguns pacotes mudam de nome quando a arquitetura muda.
         # Aqui cuidamos desse detalhe.
         if platform.architecture()[0] == "64bit":
@@ -238,13 +243,16 @@ class Prepdev():
         repository_path = self.read_config("repository_path")
         default_dir = repository_path or default_dir
 
-        msg = Colors.WARNING
-        msg += "Em qual diretório os códigos devem ficar? "
-        msg += Colors.BLUE + "({}): ".format(default_dir) + Colors.ENDC
-        answer = input(msg)
+        if self.repository_path == "":
+            msg = Colors.WARNING
+            msg += "Em qual diretório os códigos devem ficar? "
+            msg += Colors.BLUE + "({}): ".format(default_dir) + Colors.ENDC
+            answer = input(msg)
 
-        if not answer:
-            answer = default_dir
+            if not answer:
+                answer = default_dir
+        else:
+            answer = self.repository_path
 
         if "~" in answer:
             answer = os.path.expanduser(answer)
@@ -1066,13 +1074,21 @@ def configure_parseargs():
                         dest='close_connections',
                         action='store_true',
                         help="Fecha a conexão dos usuários do banco de dados.")
+    parser.add_argument('--repository_path',
+                        '-p',
+                        dest='repository_path',
+                        type=str,
+                        default="",
+                        action='store',
+                        help="Path do repositório de código.")
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = configure_parseargs()
     instance = Prepdev(resetdb=args.resetdb,
                        excludedb=args.excludedb,
-                       close_connections=args.close_connections)
+                       close_connections=args.close_connections,
+                       repository_path=args.repository_path)
     try:
         instance.run()
     except PermissionError as exc:
