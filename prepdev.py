@@ -74,13 +74,13 @@ class Prepdev():
     postgres_version = ""
     postgres_pghba = ""
 
-    def __init__(self, resetdb=False, excludedb=False, disconnect_users=False):
+    def __init__(self, resetdb=False, excludedb=False, close_connections=False):
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.prepdevrc = os.path.join(self.base_path, ".prepdevrc")
         self._create_config_file(self.ini_file)
         self.resetdb = resetdb
         self.excludedb = excludedb
-        self.disconnect_users = disconnect_users
+        self.close_connections = close_connections
         # Alguns pacotes mudam de nome quando a arquitetura muda.
         # Aqui cuidamos desse detalhe.
         if platform.architecture()[0] == "64bit":
@@ -91,14 +91,14 @@ class Prepdev():
         self.database_name = self.config["sigma:database"]["name"]
 
         # Variáveis que devem ser substituídas nos arquivos sql.
-        self.VARIABLES = {"schema_cadastro": INTERPOLATION_VALUES["schemas"]["cadastro"],
+        self.variables = {"schema_cadastro": INTERPOLATION_VALUES["schemas"]["cadastro"],
                           "schema_planejamento": INTERPOLATION_VALUES["schemas"]["planejamento"],
                           "user_importacao": self.config["sigma:database:users:importacao"]["name"],
                           "group_importacao": self.config["sigma:database:groups:importacao"]["name"]}
 
-        self.DISCONNECT_DB_COMMAND = "\"SELECT pg_terminate_backend(pid) FROM "
-        self.DISCONNECT_DB_COMMAND += "pg_stat_get_activity(NULL::integer) WHERE datid=("
-        self.DISCONNECT_DB_COMMAND += "SELECT oid from pg_database where datname = '{}');\"".format(self.database_name)
+        self.disconnect_db_command = "\"SELECT pg_terminate_backend(pid) FROM "
+        self.disconnect_db_command += "pg_stat_get_activity(NULL::integer) WHERE datid=("
+        self.disconnect_db_command += "SELECT oid from pg_database where datname = '{}');\"".format(self.database_name)
         self.current_user =  getpass.getuser()
 
     def write_config(self, name, value, section="default"):
@@ -517,7 +517,7 @@ class Prepdev():
     def close_connections(self):
         print_info("Derrubando conexões com o banco de dados.")
         cmd = "psql -h localhost -U postgres -c {}"
-        cmd += cmd.format(self.DISCONNECT_DB_COMMAND)
+        cmd += cmd.format(self.disconnect_db_command)
         call(cmd)
 
     def prepare_database(self):
@@ -651,7 +651,7 @@ class Prepdev():
         sqls = None
         with open(filename, "r") as sql_file:
             sqls = sql_file.read()
-            sqls = sqls.format(**self.VARIABLES)
+            sqls = sqls.format(**self.variables)
         sql_temp = NamedTemporaryFile(delete=False)
         sql_temp.write(bytes(sqls, 'utf-8'))
         sql_temp.seek(0)
@@ -932,7 +932,7 @@ class Prepdev():
                 sys.exit(-1)
 
     def run(self):
-        if self.disconnect_users is True:
+        if self.close_connections is True:
             self.close_connections()
         elif self.resetdb is True:
             self.configure_postgresql()
@@ -1061,18 +1061,18 @@ def configure_parseargs():
                         dest='excludedb',
                         action='store_true',
                         help="Não pedir confirmação para excluir o banco de dados.")
-    parser.add_argument('--disconnect-users',
-                        '-d',
-                        dest='disconnect_users',
+    parser.add_argument('--close-connections',
+                        '-c',
+                        dest='close_connections',
                         action='store_true',
-                        help="Derrubar usuários conectados ao banco de dados.")
+                        help="Fecha a conexão dos usuários do banco de dados.")
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = configure_parseargs()
     instance = Prepdev(resetdb=args.resetdb,
                        excludedb=args.excludedb,
-                       disconnect_users=args.disconnect_users)
+                       close_connections=args.close_connections)
     try:
         instance.run()
     except PermissionError as exc:
