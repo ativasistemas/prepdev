@@ -1079,8 +1079,9 @@ if __name__ == "__main__":
         if "pg_hba.conf" in exc.filename:
             msg = "Não consegui acessar o arquivo " + Colors.BLUE + "{}"
             msg += Colors.WARNING + ". "
-            msg += "Por favor feche essa sessão e faça login novamente."
             msg = msg.format(exc.filename)
+            print_warning(msg)
+            msg = Colors.BOLD + "Por favor feche essa sessão e faça login novamente."
             print_warning(msg)
             msg = "Caso o erro persista contate o desenvolvedor do prepdev."
             print_warning(msg)
