@@ -73,11 +73,12 @@ class Prepdev():
     postgres_version = ""
     postgres_pghba = ""
 
-    def __init__(self, resetdb=False):
+    def __init__(self, resetdb=False, excludedb=False):
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.prepdevrc = os.path.join(self.base_path, ".prepdevrc")
         self._create_config_file(self.ini_file)
         self.resetdb = resetdb
+        self.excludedb = excludedb
         # Alguns pacotes mudam de nome quando a arquitetura muda.
         # Aqui cuidamos desse detalhe.
         if platform.architecture()[0] == "64bit":
@@ -519,12 +520,15 @@ class Prepdev():
 
     def prepare_database(self):
         if self._database_exists() is True:
-            msg = "O banco de dados " + Colors.BOLD + "{}"
-            msg += Colors.ENDC + Colors.WARNING + " já existe! Posso "
-            msg += "excluí-lo e criá-lo novamente?(s/" + Colors.BOLD + "[N]"
-            msg += Colors.ENDC + Colors.WARNING + ")"
-            msg = msg.format(self.database_name)
-            answer = input(Colors.WARNING + msg + Colors.ENDC)
+            if self.excludedb is False:
+                msg = "O banco de dados " + Colors.BOLD + "{}"
+                msg += Colors.ENDC + Colors.WARNING + " já existe! Posso "
+                msg += "excluí-lo e criá-lo novamente?(s/" + Colors.BOLD + "[N]"
+                msg += Colors.ENDC + Colors.WARNING + ")"
+                msg = msg.format(self.database_name)
+                answer = input(Colors.WARNING + msg + Colors.ENDC)
+            else:
+                answer = "y"
             if answer in self.positive_answer:
                 self._drop_database()
                 self._drop_user("sigma_dba")
@@ -1048,11 +1052,16 @@ def configure_parseargs():
                         dest='resetdb',
                         action='store_true',
                         help="Resetar banco de dados.")
+    parser.add_argument('--excludedb',
+                        dest='excludedb',
+                        action='store_true',
+                        help="Não pedir confirmação para excluir o banco de dados.")
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = configure_parseargs()
-    instance = Prepdev(resetdb=args.resetdb)
+    instance = Prepdev(resetdb=args.resetdb,
+                       excludedb=args.excludedb)
     try:
         instance.run()
     except PermissionError as exc:
