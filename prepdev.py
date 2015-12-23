@@ -813,6 +813,8 @@ class Prepdev():
                     else:
                         break
                 self.postgres_version = valid_versions[answer-1]
+            else:
+                self.postgres_version = valid_versions[0]
         else:
             self.postgres_version = versions[0]
 
@@ -876,7 +878,6 @@ class Prepdev():
         o usuário deve informar qual deseja utilizar.
         """
         self.set_postgresql_pg_hba()
-        print(self.postgres_pghba)
         pghba_group = get_file_group(self.postgres_pghba)
         user_groups = get_additional_groups_name(self.current_user)
 
