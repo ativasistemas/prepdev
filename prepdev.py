@@ -78,7 +78,8 @@ class Prepdev():
                  resetdb=False,
                  excludedb=False,
                  close_connections=False,
-                 repository_path=""):
+                 repository_path="",
+                 sigma_help=False):
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.prepdevrc = os.path.join(self.base_path, ".prepdevrc")
         self._create_config_file(self.ini_file)
@@ -86,6 +87,7 @@ class Prepdev():
         self.excludedb = excludedb
         self.close_connections = close_connections
         self.repository_path = repository_path
+        self.sigma_help = sigma_help
         # Alguns pacotes mudam de nome quando a arquitetura muda.
         # Aqui cuidamos desse detalhe.
         if platform.architecture()[0] == "64bit":
@@ -666,6 +668,11 @@ class Prepdev():
         return sql_temp.name
 
     def make_commands(self):
+        """
+        Cria os comandos personalizados.
+
+        Os comandos nada mais são do que alias criados no arquivo ~/.bashrc.
+        """
         print_info("Criando comandos personalizados...")
         comment = "\n# Alias criado pelo comando prepdev do sigma.\n"
         sigma = "alias sigma='{} cd {}'"
@@ -673,6 +680,7 @@ class Prepdev():
         sigmalib = "alias sigmalib='{} cd {}'"
         sigmalib = sigmalib.format(self.activate_venv, self.sigmalib_path)
         prepdev = "alias prepdev='{}/prepdev.py'".format(self.base_path)
+        sigma_help = "alias sigma_help='{}/prepdev.py --sigma-help'".format(self.base_path)
         if os.path.exists(self.bashrc) is True:
             with open(self.bashrc, "r+") as f:
                 # Se o alias ainda não foi criado. Crie-o.
@@ -688,6 +696,10 @@ class Prepdev():
                 if prepdev not in f.read():
                     f.write(prepdev)
                     f.write("\n")
+                f.seek(0)
+                if sigma_help not in f.read():
+                    f.write(sigma_help)
+                    f.write("\n")
         else:
             with open(self.bashrc, "w") as f:
                 f.write(comment)
@@ -699,6 +711,9 @@ class Prepdev():
                 f.write("\n")
 
     def finish(self):
+        """
+        Imprime o nome sigma.
+        """
         print_format = "{:^80}"
         msg = "██████╗██╗ ██████╗ ███╗   ███╗ █████╗"
         print_blue(print_format.format(msg))
@@ -714,6 +729,9 @@ class Prepdev():
         print_blue(print_format.format(msg))
 
     def print_help(self):
+        """
+        Imprime um help básico dos comandos criado.
+        """
         cmd, cmd_help = "sigma_server", "Executa o servidor."
         print_warning(format_cmd_print(cmd, cmd_help))
         cmd, cmd_help = "sigma_run_migrations", "Faz upgrade do banco de dados."
@@ -735,6 +753,9 @@ class Prepdev():
         cmd, cmd_help = "prepdev", "Atualiza/reconfigura o ambiente de "
         cmd_help += "desenvolvimento."
         print_warning(format_cmd_print(cmd, cmd_help))
+        cmd, cmd_help = "sigma_help", "Imprime uma ajuda rápida dos comandos "
+        cmd_help += "disponíveis."
+        print_warning(format_cmd_print(cmd, cmd_help))
         msg = "Para entrar manualmente no ambiente virtual, use o comando:"
         print_warning(msg, end=" ")
         msg = "source {}/bin/activate".format(self.venv)
@@ -744,6 +765,9 @@ class Prepdev():
         print_warning(Colors.BOLD + msg)
 
     def postgres_warning(self, local=True, trust=True):
+        """
+        Imprime na tela instruções de configuração do arquivo pg_hba.conf
+        """
         print("{:#^80}".format("Atenção"))
         msg = "Acrescente a(s) linha(s) que não está(ão) presente(s) no arquivo obedeça a ordem das linhas" + Colors.BOLD + " {}" + Colors.ENDC + Colors.WARNING + ":"
         msg = msg.format(self.pg_hba_path)
@@ -879,6 +903,9 @@ class Prepdev():
                                                  clusters[0])
 
     def set_postgresql_pg_hba(self):
+        """
+        Configura a localização do arquivo pg_hba.conf.
+        """
         self.set_postgresql_cluster()
         self.postgres_pghba = os.path.join(self.postgres_cluster, "pg_hba.conf")
 
@@ -942,6 +969,8 @@ class Prepdev():
     def run(self):
         if self.close_connections is True:
             self.close_db_connections()
+        elif self.sigma_help is True:
+            self.print_help()
         elif self.resetdb is True:
             self.configure_postgresql()
             self.set_instalation_path()
@@ -1017,6 +1046,9 @@ def get_file_gid(filepath):
     return gid
 
 def get_file_group(filepath):
+    """
+    Retorna o grupo de um arquivo.
+    """
     gid = get_file_gid(filepath)
     group = grp.getgrgid(gid)[0]
     return group
@@ -1042,6 +1074,9 @@ def print_error(msg, end="\n"):
 
 
 def call(command, print_output=False):
+    """
+    Executa um comando de terminal.
+    """
     cmd = ["bash", "-c"]
     cmd.append(command)
     if print_output is False:
@@ -1056,6 +1091,9 @@ def format_cmd_print(cmd, help):
     return msg
 
 def configure_parseargs():
+    """
+    Configura os parâmetros do comando.
+    """
     description = "Prepara o ambiente de desenvolvimento para os projetos "
     description += "sigma e sigmalib."
     parser = argparse.ArgumentParser(description=description)
@@ -1074,13 +1112,17 @@ def configure_parseargs():
                         dest='close_connections',
                         action='store_true',
                         help="Fecha a conexão dos usuários do banco de dados.")
-    parser.add_argument('--repository_path',
+    parser.add_argument('--repository-path',
                         '-p',
                         dest='repository_path',
                         type=str,
                         default="",
                         action='store',
                         help="Path do repositório de código.")
+    parser.add_argument('--sigma-help',
+                        dest='sigma_help',
+                        action='store_true',
+                        help="Imprime a ajuda rápida dos comandos.")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -1088,7 +1130,8 @@ if __name__ == "__main__":
     instance = Prepdev(resetdb=args.resetdb,
                        excludedb=args.excludedb,
                        close_connections=args.close_connections,
-                       repository_path=args.repository_path)
+                       repository_path=args.repository_path,
+                       sigma_help=args.sigma_help)
     try:
         instance.run()
     except PermissionError as exc:
