@@ -15,6 +15,7 @@ import apt
 import platform
 import grp
 import pwd
+import argparse
 
 INTERPOLATION_VALUES = {
     "schemas": {
@@ -1047,7 +1048,6 @@ def format_cmd_print(cmd, help):
     return msg
 
 def configure_parseargs():
-    import argparse
     description = "Prepara o ambiente de desenvolvimento para os projetos "
     description += "sigma e sigmalib."
     parser = argparse.ArgumentParser(description=description)
