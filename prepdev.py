@@ -73,10 +73,11 @@ class Prepdev():
     postgres_version = ""
     postgres_pghba = ""
 
-    def __init__(self):
+    def __init__(self, resetdb=False):
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.prepdevrc = os.path.join(self.base_path, ".prepdevrc")
         self._create_config_file(self.ini_file)
+        self.resetdb = resetdb
         # Alguns pacotes mudam de nome quando a arquitetura muda.
         # Aqui cuidamos desse detalhe.
         if platform.architecture()[0] == "64bit":
@@ -925,27 +926,36 @@ class Prepdev():
                 sys.exit(-1)
 
     def run(self):
-        self.configure_postgresql()
-        self.set_instalation_path()
-        self.check_postgresql_version()
-        self.create_venv()
-        self.search_dependencies()
-        self.create_ssh_keys()
-        self.create_ssh_config()
-        self.github_configured()
-        self.so_dependencies()
-        self.clone_sigma()
-        self.clone_sigmalib()
-        self.update_packages()
-        self.setup_develop()
-        self.install_sigmalib()
-        self.close_connections()
-        self.prepare_database()
-        self.run_migrations()
-        self.populate_db()
-        self.make_commands()
-        self.finish()
-        self.print_help()
+        if self.resetdb is True:
+            self.configure_postgresql()
+            self.set_instalation_path()
+            self.check_postgresql_version()
+            self.close_connections()
+            self.prepare_database()
+            self.run_migrations()
+            self.populate_db()
+        else:
+            self.configure_postgresql()
+            self.set_instalation_path()
+            self.check_postgresql_version()
+            self.create_venv()
+            self.search_dependencies()
+            self.create_ssh_keys()
+            self.create_ssh_config()
+            self.github_configured()
+            self.so_dependencies()
+            self.clone_sigma()
+            self.clone_sigmalib()
+            self.update_packages()
+            self.setup_develop()
+            self.install_sigmalib()
+            self.close_connections()
+            self.prepare_database()
+            self.run_migrations()
+            self.populate_db()
+            self.make_commands()
+            self.finish()
+            self.print_help()
 
 class Colors:
     HEADER = '\033[95m'
@@ -960,7 +970,7 @@ class Colors:
 
 def add_user_to_group(username, group):
     """
-    Adiciona o username ao group.
+    Adiciona um usuário a um group.
     """
     cmd = "sudo usermod -G {} -a {}".format(group, username)
     call(cmd)
@@ -1029,8 +1039,20 @@ def format_cmd_print(cmd, help):
     msg += " => " + help
     return msg
 
+def configure_parseargs():
+    import argparse
+    description = "Prepara o ambiente de desenvolvimento para os projetos "
+    description += "sigma e sigmalib."
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument('--resetdb',
+                        dest='resetdb',
+                        action='store_true',
+                        help="Resetar banco de dados.")
+    return parser.parse_args()
+
 if __name__ == "__main__":
-    instance = Prepdev()
+    args = configure_parseargs()
+    instance = Prepdev(resetdb=args.resetdb)
     try:
         instance.run()
     except PermissionError as exc:
