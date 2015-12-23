@@ -32,6 +32,10 @@ class InvalidPostgresqlVersionError(Exception):
     pass
 
 
+class InvalidPostgresqlClusterError(Exception):
+    pass
+
+
 class GitHubNotConfiguredError(Exception):
     pass
 
@@ -64,7 +68,10 @@ class Prepdev():
                 "python3-dev", "libpq-dev",
                 "postgresql-plpython3-9.4", "python-virtualenv"]
     database_name = ""
-    pg_hba_path = ""
+    postgres_config_base_path = "/etc/postgresql"
+    postgres_cluster = ""
+    postgres_version = ""
+    postgres_pghba = ""
 
     def __init__(self):
         self.base_path = os.path.dirname(os.path.abspath(__file__))
@@ -757,6 +764,107 @@ class Prepdev():
         else:
             return False
 
+    def set_postgresql_version(self):
+        """
+        Solicita que o usuário escolha a versão do postgresql que deseja usar.
+
+        Quando existir apenas uma versão do postgresql instalada não faz nenhum
+        questionamento.
+        Quando existe mais de uma versão mas somente uma é compatível com o
+        sigma não faz questionamento.
+        Quando existe mais de uma versão compatível com o sigma, solicita que o
+        usuário escolha qual deseja utilizar.
+        """
+        versions = os.listdir(self.postgres_config_base_path)
+        valid_versions = []
+        if len(versions) > 1:
+            required_major_version = int(self.min_postgres_version.split(".")[0])
+            required_minor_version = int(self.min_postgres_version.split(".")[1])
+            for version in versions:
+                major = int(version.split(".")[0])
+                minor = int(version.split(".")[1])
+                if major >= required_major_version and minor >= required_minor_version:
+                    valid_versions.append(version)
+            if len(valid_versions) == 0:
+                msg = "Não foi encontrada uma versão válida do postgresql."
+                msg += "A versão mínima exigida é: {}"
+                msg = msg.format(self.min_postgres_version)
+                raise InvalidPostgresqlVersionError(msg)
+            elif len(valid_versions) > 1:
+                msg = "Você possui {} versões compatíveis do postgresql "
+                msg += "instaladas. Por favor escolha uma das opções abaixo:"
+                msg = msg.format(len(valid_versions))
+                print_warning(msg)
+                for index in range(len(valid_versions)):
+                    msg = "Opção {} - versão {}".format(index + 1,
+                                                  valid_versions[index])
+                    print_blue(msg)
+                while True:
+                    msg = "Qual versão você deseja utilizar? "
+                    answer = input(msg)
+                    try:
+                        answer = int(answer)
+                        if answer > len(valid_versions):
+                            raise Exception
+                        if answer < 1:
+                            raise Exception
+                    except Exception:
+                        print_error("Opção inválida.")
+                    else:
+                        break
+                self.postgres_version = valid_versions[answer-1]
+        else:
+            self.postgres_version = versions[0]
+
+    def set_postgresql_cluster(self):
+        """
+        Solicita que o usuário escolha o cluster do postgresql que deseja usar.
+
+        Quando existir apenas um cluster não faz nenhum questionamento.
+        Quando existe mais de um cluster solicita que o usuário escolha qual
+        deseja utilizar.
+        """
+        self.set_postgresql_version()
+        self.postgres_cluster = os.path.join(self.postgres_config_base_path,
+                                             self.postgres_version)
+        clusters = os.listdir(self.postgres_cluster)
+        if len(clusters) > 1:
+            msg = "Você possui {} clusters do postgresql configurados. "
+            msg += "Por favor informe qual o sigma deve utilizar:"
+            msg = msg.format(len(clusters))
+            print_warning(msg)
+            for index in range(len(clusters)):
+                msg = "Opção {} - cluster {}".format(index + 1,
+                                                     clusters[index])
+                print_blue(msg)
+            while True:
+                msg = "Qual cluster você deseja utilizar? "
+                answer = input(msg)
+                try:
+                    answer = int(answer)
+                    if answer > len(clusters):
+                        raise Exception
+                    if answer < 1:
+                        raise Exception
+                except Exception:
+                    print_error("Opção inválida.")
+                else:
+                    break
+            self.postgres_cluster = os.path.join(self.postgres_cluster,
+                                                 clusters[answer-1])
+        elif len(clusters) == 0:
+            msg = "Não foi encontrado nenhum cluster para versão {}. "
+            msg += "Verifique sua instalação do postgresql e tente novamente."
+            msg = msg.format(self.postgres_version)
+            raise InvalidPostgresqlClusterError(msg)
+        else:
+            self.postgres_cluster = os.path.join(self.postgres_cluster,
+                                                 clusters[0])
+
+    def set_postgresql_pg_hba(self):
+        self.set_postgresql_cluster()
+        self.postgres_pghba = os.path.join(self.postgres_cluster, "pg_hba.conf")
+
     def configure_postgresql(self):
         """
         Realiza todas as configurações necessárias no postgresql.
@@ -767,13 +875,9 @@ class Prepdev():
         TODO: Quando houver mais de um subdiretório dentro de /etc/postgresql
         o usuário deve informar qual deseja utilizar.
         """
-        postgres_config_path = "/etc/postgresql"
-        postgres_cluster = os.listdir(postgres_config_path)[0]
-        postgres_config_path = os.path.join(postgres_config_path,
-                                            postgres_cluster)
-        postgres_pghba = os.path.join(postgres_config_path, "main", "pg_hba.conf")
-        self.pg_hba_path = postgres_pghba
-        pghba_group = get_file_group(postgres_pghba)
+        self.set_postgresql_pg_hba()
+        print(self.postgres_pghba)
+        pghba_group = get_file_group(self.postgres_pghba)
         user_groups = get_additional_groups_name(self.current_user)
 
         if pghba_group not in user_groups:
@@ -782,14 +886,14 @@ class Prepdev():
             print_info(msg)
             add_user_to_group(self.current_user, pghba_group)
 
-        if os.path.exists(postgres_pghba) is True:
+        if os.path.exists(self.postgres_pghba) is True:
             DATABASE = 1
             USER = 2
             HOST = 3
             METHOD = 4
             local_access = False
             trust_access = False
-            with open(postgres_pghba, "r") as pg_hba:
+            with open(self.postgres_pghba, "r") as pg_hba:
                 for line in pg_hba.readlines():
                     database = False
                     user = False
@@ -902,6 +1006,14 @@ def print_blue(msg, end="\n"):
     print(Colors.BLUE + msg + Colors.ENDC, end=end)
 
 
+def print_red(msg, end="\n"):
+    print(Colors.FAIL + msg + Colors.ENDC, end=end)
+
+
+def print_error(msg, end="\n"):
+    print_red(msg, end=end)
+
+
 def call(command, print_output=False):
     cmd = ["bash", "-c"]
     cmd.append(command)
@@ -929,8 +1041,3 @@ if __name__ == "__main__":
             print_warning(msg)
             msg = "Caso o erro persista contate o desenvolvedor do prepdev."
             print_warning(msg)
-    except FileNotFoundError as exc:
-        print_warning("{}: {}".format(exc.strerror, exc.filename))
-    except Exception as exc:
-        print(exc)
-        print_warning(exc.args[0])
