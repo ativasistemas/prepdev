@@ -1,7 +1,8 @@
 # prepdev
 Script de preparação do ambiente de desenvolvimento do sistema SIGMA.
 
-# O que este script faz(não necessáriamente nesta ordem)?
+# O que este script faz?
+#### *Não necessáriamente nesta ordem*
 * Verifica se as chaves RSA para acesso aos repositórios existe, e caso não exista, as gera;
 * Verifica se as chaves RSA existentes dá acesso aos repositórios, caso não dê, exibe as chaves públicas para que o usuário possa fazer/solicitar a configuração dos repositórios;
 * Configura o ssh para acessar cada repositório com sua respectiva chave;
