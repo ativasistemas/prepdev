@@ -514,7 +514,7 @@ class Prepdev():
         cmd = self.pip_install.format(url)
         call(cmd)
 
-    def close_connections(self):
+    def close_db_connections(self):
         print_info("Derrubando conexões com o banco de dados.")
         cmd = "psql -h localhost -U postgres -c {}"
         cmd += cmd.format(self.disconnect_db_command)
@@ -933,12 +933,12 @@ class Prepdev():
 
     def run(self):
         if self.close_connections is True:
-            self.close_connections()
+            self.close_db_connections()
         elif self.resetdb is True:
             self.configure_postgresql()
             self.set_instalation_path()
             self.check_postgresql_version()
-            self.close_connections()
+            self.close_db_connections()
             self.prepare_database()
             self.run_migrations()
             self.populate_db()
@@ -957,7 +957,7 @@ class Prepdev():
             self.update_packages()
             self.setup_develop()
             self.install_sigmalib()
-            self.close_connections()
+            self.close_db_connections()
             self.prepare_database()
             self.run_migrations()
             self.populate_db()
