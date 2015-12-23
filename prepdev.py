@@ -73,12 +73,13 @@ class Prepdev():
     postgres_version = ""
     postgres_pghba = ""
 
-    def __init__(self, resetdb=False, excludedb=False):
+    def __init__(self, resetdb=False, excludedb=False, disconnect_users=False):
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.prepdevrc = os.path.join(self.base_path, ".prepdevrc")
         self._create_config_file(self.ini_file)
         self.resetdb = resetdb
         self.excludedb = excludedb
+        self.disconnect_users = disconnect_users
         # Alguns pacotes mudam de nome quando a arquitetura muda.
         # Aqui cuidamos desse detalhe.
         if platform.architecture()[0] == "64bit":
@@ -930,7 +931,9 @@ class Prepdev():
                 sys.exit(-1)
 
     def run(self):
-        if self.resetdb is True:
+        if self.disconnect_users is True:
+            self.close_connections()
+        elif self.resetdb is True:
             self.configure_postgresql()
             self.set_instalation_path()
             self.check_postgresql_version()
@@ -1049,19 +1052,27 @@ def configure_parseargs():
     description += "sigma e sigmalib."
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('--resetdb',
+                        '-r',
                         dest='resetdb',
                         action='store_true',
                         help="Resetar banco de dados.")
     parser.add_argument('--excludedb',
+                        '-e',
                         dest='excludedb',
                         action='store_true',
                         help="Não pedir confirmação para excluir o banco de dados.")
+    parser.add_argument('--disconnect-users',
+                        '-d',
+                        dest='disconnect_users',
+                        action='store_true',
+                        help="Derrubar usuários conectados ao banco de dados.")
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = configure_parseargs()
     instance = Prepdev(resetdb=args.resetdb,
-                       excludedb=args.excludedb)
+                       excludedb=args.excludedb,
+                       disconnect_users=args.disconnect_users)
     try:
         instance.run()
     except PermissionError as exc:
