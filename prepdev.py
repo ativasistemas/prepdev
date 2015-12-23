@@ -13,6 +13,8 @@ from tempfile import NamedTemporaryFile
 import getpass
 import apt
 import platform
+import grp
+import pwd
 
 INTERPOLATION_VALUES = {
     "schemas": {
@@ -62,6 +64,7 @@ class Prepdev():
                 "python3-dev", "libpq-dev",
                 "postgresql-plpython3-9.4", "python-virtualenv"]
     database_name = ""
+    pg_hba_path = ""
 
     def __init__(self):
         self.base_path = os.path.dirname(os.path.abspath(__file__))
@@ -85,6 +88,7 @@ class Prepdev():
         self.DISCONNECT_DB_COMMAND = "\"SELECT pg_terminate_backend(pid) FROM "
         self.DISCONNECT_DB_COMMAND += "pg_stat_get_activity(NULL::integer) WHERE datid=("
         self.DISCONNECT_DB_COMMAND += "SELECT oid from pg_database where datname = '{}');\"".format(self.database_name)
+        self.current_user =  getpass.getuser()
 
     def write_config(self, name, value, section="default"):
         """
@@ -535,7 +539,6 @@ class Prepdev():
             self._drop_group("gimportacao_sigma")
         self._generate_environment()
         self._copy_environment()
-        self._set_postgres_permissions()
         self._restart_database()
         self._set_postgres_password()
 
@@ -586,18 +589,6 @@ class Prepdev():
         cmd = "sudo cp -f /tmp/environment /etc/postgresql/9.4/main/"
         call(cmd)
 
-    def _set_postgres_permissions(self):
-        """
-        Adiciona o usuário postgres ao grupo do usuário atualmente logado.
-
-        Como o ambiente virtual é criado para o usuário logado, o postgres
-        precisa ser colocado no grupo deste usuário. Caso contrário ele não
-        conseguirá ter acesso as bibliotecas do virtualenv.
-        """
-        user = getpass.getuser()
-        cmd = "sudo usermod -G {} -a postgres".format(user)
-        call(cmd)
-
     def _set_postgres_password(self):
         print_info("Configurando senha do usuário postgres...")
         cmd = "psql -h localhost -U postgres -c \"alter user postgres with "
@@ -610,11 +601,11 @@ class Prepdev():
             # cmd = self.activate_venv
             cmd = "cd {}; {} sigma/migrations/sprint_1.py {};"
             cmd = cmd.format(self.sigma_path, self.python, self.ini_file)
-            call(cmd)
+            call(cmd, True)
         cmd = self.activate_venv
         cmd += "cd {}; sigma_run_migrations -b {}".format(self.sigma_path,
                                                           self.ini_file)
-        call(cmd)
+        call(cmd, True)
 
     def populate_db(self):
         msg = "Deseja carregar os dados de desenvolvimento no banco de dados? "
@@ -632,7 +623,7 @@ class Prepdev():
                         sql_file = self._pre_process_sql(sql_file)
                         cmd = "psql -h localhost -U postgres -d {} -f {}"
                         cmd = cmd.format(self.database_name, sql_file)
-                        call(cmd)
+                        call(cmd, True)
 
     def _pre_process_sql(self, filename):
         """
@@ -719,6 +710,9 @@ class Prepdev():
         cmd, cmd_help = "sigma", "Ativa o ambiente virtual do sigma e muda "
         cmd_help += "para o diretório do projeto."
         print_warning(format_cmd_print(cmd, cmd_help))
+        cmd, cmd_help = "prepdev", "Atualiza/reconfigura o ambiente de "
+        cmd_help += "desenvolvimento."
+        print_warning(format_cmd_print(cmd, cmd_help))
         msg = "Para entrar manualmente no ambiente virtual, use o comando:"
         print_warning(msg, end=" ")
         msg = "source {}/bin/activate".format(self.venv)
@@ -727,11 +721,25 @@ class Prepdev():
         msg += "terminal e abra novamente."
         print_warning(Colors.BOLD + msg)
 
-    def postgres_warning(self):
+    def postgres_warning(self, local=True, trust=True):
         print("{:#^80}".format("Atenção"))
-        print_warning("As seguintes linhas devem estar presentes no pg_hba.conf" + Colors.BOLD + "(na mesma ordem)" + Colors.ENDC + Colors.WARNING + ":")
-        print(Colors.BLUE + "host    all             postgres        127.0.0.1/32            trust" + Colors.ENDC)
-        print(Colors.BLUE + "host    all             all             127.0.0.1/32            md5" + Colors.ENDC)
+        msg = "Acrescente a(s) linha(s) que não está(ão) presente(s) no arquivo obedeça a ordem das linhas" + Colors.BOLD + " {}" + Colors.ENDC + Colors.WARNING + ":"
+        msg = msg.format(self.pg_hba_path)
+        print_warning(msg)
+        msg = Colors.BLUE + "host    all             postgres        127.0.0.1/32            trust"
+        if trust is True:
+            msg += Colors.GREEN + Colors.BOLD + " (Está presente)"
+        else:
+            msg += Colors.FAIL + Colors.BOLD + " (Não está presente)"
+        msg += Colors.ENDC
+        print(msg)
+        msg = Colors.BLUE + "host    all             all             127.0.0.1/32            md5"
+        if local is True:
+            msg += Colors.GREEN + Colors.BOLD + " (Está presente)"
+        else:
+            msg += Colors.FAIL + Colors.BOLD + " (Não está presente)"
+        msg += Colors.ENDC
+        print(msg)
 
     def important_message(self):
         """
@@ -749,34 +757,90 @@ class Prepdev():
         else:
             return False
 
+    def configure_postgresql(self):
+        """
+        Realiza todas as configurações necessárias no postgresql.
+
+        1 - Verifica se o usuário pertence ao grupo do arquivo pg_hba.conf.
+        2 - Verifica se o arquivo pg_hba.conf possui as entradas necessárias.
+
+        TODO: Quando houver mais de um subdiretório dentro de /etc/postgresql
+        o usuário deve informar qual deseja utilizar.
+        """
+        postgres_config_path = "/etc/postgresql"
+        postgres_cluster = os.listdir(postgres_config_path)[0]
+        postgres_config_path = os.path.join(postgres_config_path,
+                                            postgres_cluster)
+        postgres_pghba = os.path.join(postgres_config_path, "main", "pg_hba.conf")
+        self.pg_hba_path = postgres_pghba
+        pghba_group = get_file_group(postgres_pghba)
+        user_groups = get_additional_groups_name(self.current_user)
+
+        if pghba_group not in user_groups:
+            msg = "Adicionando usuário {} ao grupo {}"
+            msg = msg.format(self.current_user, pghba_group)
+            print_info(msg)
+            add_user_to_group(self.current_user, pghba_group)
+
+        if os.path.exists(postgres_pghba) is True:
+            DATABASE = 1
+            USER = 2
+            HOST = 3
+            METHOD = 4
+            local_access = False
+            trust_access = False
+            with open(postgres_pghba, "r") as pg_hba:
+                for line in pg_hba.readlines():
+                    database = False
+                    user = False
+                    host = False
+                    line = line.strip()
+                    if not line.startswith("#") and line.startswith("host"):
+                        line = " ".join(line.split()).split()
+                        if line[METHOD] == "trust":
+                            if line[DATABASE] in ["all", self.database_name]:
+                                database = True
+                            if line[USER] in ["postgres"]:
+                                user = True
+                            if line[HOST] in ["127.0.0.1", "0.0.0.0", "127.0.0.1/32"]:
+                                host = True
+                            if all([database, user, host]):
+                                trust_access = True
+                        elif line[METHOD] == "md5":
+                            if line[DATABASE] in ["all", self.database_name]:
+                                database = True
+                            if line[USER] in ["all"]:
+                                user = True
+                            if line[HOST] in ["127.0.0.1", "0.0.0.0", "127.0.0.1/32"]:
+                                host = True
+                            if all([database, user, host]):
+                                local_access = True
+            if local_access is False or trust_access is False:
+                self.postgres_warning(local_access, trust_access)
+                sys.exit(-1)
+
     def run(self):
-        if self.important_message() is True:
-            self.set_instalation_path()
-            self.check_postgresql_version()
-            self.create_venv()
-            self.search_dependencies()
-            self.create_ssh_keys()
-            self.create_ssh_config()
-            self.github_configured()
-            self.so_dependencies()
-            self.clone_sigma()
-            self.clone_sigmalib()
-            self.update_packages()
-            self.setup_develop()
-            self.install_sigmalib()
-            self.close_connections()
-            self.prepare_database()
-            self.run_migrations()
-            self.populate_db()
-            self.make_commands()
-            self.finish()
-            self.print_help()
-        else:
-            msg = "Configure o postgresql para aceitar conexões confiáveis "
-            msg += "vindas de localhost(" + Colors.BLUE + "/etc/postgresql/"
-            msg += "<version>/pg_hba.conf" + Colors.GREEN + ")."
-            print_warning(msg)
-            self.postgres_warning()
+        self.configure_postgresql()
+        self.set_instalation_path()
+        self.check_postgresql_version()
+        self.create_venv()
+        self.search_dependencies()
+        self.create_ssh_keys()
+        self.create_ssh_config()
+        self.github_configured()
+        self.so_dependencies()
+        self.clone_sigma()
+        self.clone_sigmalib()
+        self.update_packages()
+        self.setup_develop()
+        self.install_sigmalib()
+        self.close_connections()
+        self.prepare_database()
+        self.run_migrations()
+        self.populate_db()
+        self.make_commands()
+        self.finish()
+        self.print_help()
 
 class Colors:
     HEADER = '\033[95m'
@@ -788,6 +852,43 @@ class Colors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+
+def add_user_to_group(username, group):
+    """
+    Adiciona o username ao group.
+    """
+    cmd = "sudo usermod -G {} -a {}".format(group, username)
+    call(cmd)
+
+def get_additional_groups_id(username):
+    """
+    Retorna o id dos grupos adicionais do usuário.
+    """
+    groups = [g.gr_gid for g in grp.getgrall() if username in g.gr_mem]
+    gid = pwd.getpwnam(username).pw_gid
+    groups.append(grp.getgrgid(gid).gr_gid)
+    return groups
+
+def get_additional_groups_name(username):
+    """
+    Retorna o nome dos grupos adicionais do usuário.
+    """
+    groups_id = get_additional_groups_id(username)
+    groups = [grp.getgrgid(gid).gr_name for gid in groups_id]
+    return groups
+
+def get_file_gid(filepath):
+    """
+    Retorna o gid de filepath.
+    """
+    stat_info = os.stat(filepath)
+    gid = stat_info.st_gid
+    return gid
+
+def get_file_group(filepath):
+    gid = get_file_gid(filepath)
+    group = grp.getgrgid(gid)[0]
+    return group
 
 def print_info(msg, end="\n"):
     print(Colors.GREEN + msg + Colors.ENDC, end=end)
@@ -819,5 +920,17 @@ if __name__ == "__main__":
     instance = Prepdev()
     try:
         instance.run()
+    except PermissionError as exc:
+        if "pg_hba.conf" in exc.filename:
+            msg = "Não consegui acessar o arquivo " + Colors.BLUE + "{}"
+            msg += Colors.WARNING + ". "
+            msg += "Por favor feche essa sessão e faça login novamente."
+            msg = msg.format(exc.filename)
+            print_warning(msg)
+            msg = "Caso o erro persista contate o desenvolvedor do prepdev."
+            print_warning(msg)
+    except FileNotFoundError as exc:
+        print_warning("{}: {}".format(exc.strerror, exc.filename))
     except Exception as exc:
+        print(exc)
         print_warning(exc.args[0])
