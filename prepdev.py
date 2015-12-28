@@ -11,11 +11,37 @@ import sys
 import configparser
 from tempfile import NamedTemporaryFile
 import getpass
-import apt
 import platform
 import grp
 import pwd
 import argparse
+
+class Colors:
+    HEADER = '\033[95m'
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+try:
+    import apt
+except ImportError:
+    msg = Colors.WARNING + Colors.BOLD + "O módulo "
+    msg += Colors.BLUE + "apt" + Colors.ENDC + Colors.WARNING + Colors.BOLD
+    msg += " não foi encontrado."
+    msg += Colors.ENDC
+    print(msg)
+    msg = Colors.WARNING
+    msg += "Para corrigir este erro saia do seu ambiente virtual("
+    msg += Colors.BLUE + Colors.BOLD + "deactivate" + Colors.ENDC
+    msg += Colors.WARNING + "), "
+    msg += "exclua o diretório do seu ambiente virtual e execute novamente."
+    msg += Colors.ENDC
+    print(msg)
+    sys.exit(-1)
 
 INTERPOLATION_VALUES = {
     "schemas": {
@@ -1031,17 +1057,6 @@ class Prepdev():
             self.make_commands()
             self.finish()
             self.print_help()
-
-class Colors:
-    HEADER = '\033[95m'
-    BLUE = '\033[94m'
-    GREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-
 
 def add_user_to_group(username, group):
     """
