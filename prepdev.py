@@ -233,7 +233,7 @@ class Prepdev():
         """
         print_info("Criando ambiente virtual...")
         if not os.path.exists(self.venv_path):
-            cmd = "virtualenv {} -p python3".format(self.venv_path)
+            cmd = "virtualenv {} -p python3 --system-site-packages".format(self.venv_path)
             call(cmd)
 
     def set_instalation_path(self):
