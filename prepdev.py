@@ -1097,32 +1097,38 @@ def configure_parseargs():
     description = "Prepara o ambiente de desenvolvimento para os projetos "
     description += "sigma e sigmalib."
     parser = argparse.ArgumentParser(description=description)
+    help_text = "Executar somente o reset do banco de dados."
     parser.add_argument('--resetdb',
                         '-r',
                         dest='resetdb',
                         action='store_true',
-                        help="Executar somente o reset do banco de dados.")
+                        help=help_text)
+    help_text = "Não pedir confirmação para excluir o banco de dados."
     parser.add_argument('--excludedb',
                         '-e',
                         dest='excludedb',
                         action='store_true',
-                        help="Não pedir confirmação para excluir o banco de dados.")
+                        help=help_text)
+    help_text = "Executar somente o fechamento das conexões com o banco de "
+    help_text += "dados."
     parser.add_argument('--close-connections',
                         '-c',
                         dest='close_connections',
                         action='store_true',
-                        help="Executar somente o fechamento das conexões com o banco de dados.")
+                        help=help_text)
+    help_text = "Local do repositório de código."
     parser.add_argument('--repository-path',
                         '-p',
                         dest='repository_path',
                         type=str,
                         default="",
                         action='store',
-                        help="Local do repositório de código.")
+                        help=help_text)
+    help_text = "Imprime a ajuda rápida dos comandos personalizados."
     parser.add_argument('--sigma-help',
                         dest='sigma_help',
                         action='store_true',
-                        help="Imprime a ajuda rápida dos comandos personalizados.")
+                        help=help_text)
     return parser.parse_args()
 
 if __name__ == "__main__":
