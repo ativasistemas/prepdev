@@ -1101,7 +1101,7 @@ def configure_parseargs():
                         '-r',
                         dest='resetdb',
                         action='store_true',
-                        help="Resetar banco de dados.")
+                        help="Executar somente o reset do banco de dados.")
     parser.add_argument('--excludedb',
                         '-e',
                         dest='excludedb',
@@ -1111,18 +1111,18 @@ def configure_parseargs():
                         '-c',
                         dest='close_connections',
                         action='store_true',
-                        help="Fecha a conexão dos usuários do banco de dados.")
+                        help="Executar somente o fechamento das conexões com o banco de dados.")
     parser.add_argument('--repository-path',
                         '-p',
                         dest='repository_path',
                         type=str,
                         default="",
                         action='store',
-                        help="Path do repositório de código.")
+                        help="Local do repositório de código.")
     parser.add_argument('--sigma-help',
                         dest='sigma_help',
                         action='store_true',
-                        help="Imprime a ajuda rápida dos comandos.")
+                        help="Imprime a ajuda rápida dos comandos personalizados.")
     return parser.parse_args()
 
 if __name__ == "__main__":
