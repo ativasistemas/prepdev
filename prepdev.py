@@ -233,7 +233,8 @@ class Prepdev():
         """
         print_info("Criando ambiente virtual...")
         if not os.path.exists(self.venv_path):
-            cmd = "virtualenv {} -p python3 --system-site-packages".format(self.venv_path)
+            cmd = "virtualenv {} -p python3 --system-site-packages"
+            cmd = cmd.format(self.venv_path)
             call(cmd)
 
     def set_instalation_path(self):
@@ -284,8 +285,8 @@ class Prepdev():
         version = ret.replace("\n", "").strip()
         major = version.split(".")[0]
         minor = version.split(".")[1]
-        major = int(major) >= int(self.min_postgres_version.split(".")[0])
-        minor = int(minor) >= int(self.min_postgres_version.split(".")[1])
+        major = int(major) >= self._valid_postgresql_major_versions()
+        minor = int(minor) >= self._valid_postgresql_minor_versions()
         if all((major, minor)) is False:
             msg = "Instale o postgresql {} ou superior. Sua versão é: {}"
             msg = msg.format(self.min_postgres_version, version)
@@ -680,7 +681,8 @@ class Prepdev():
         sigmalib = "alias sigmalib='{} cd {}'"
         sigmalib = sigmalib.format(self.activate_venv, self.sigmalib_path)
         prepdev = "alias prepdev='{}/prepdev.py'".format(self.base_path)
-        sigma_help = "alias sigma_help='{}/prepdev.py --sigma-help'".format(self.base_path)
+        sigma_help = "alias sigma_help='{}/prepdev.py --sigma-help'"
+        sigma_help = sigma_help.format(self.base_path)
         if os.path.exists(self.bashrc) is True:
             with open(self.bashrc, "r+") as f:
                 # Se o alias ainda não foi criado. Crie-o.
@@ -759,27 +761,32 @@ class Prepdev():
         msg = "Para entrar manualmente no ambiente virtual, use o comando:"
         print_warning(msg, end=" ")
         msg = "source {}/bin/activate".format(self.venv)
-        print(Colors.BLUE + Colors.BOLD + msg + Colors.ENDC)
+        # print(Colors.BLUE + Colors.BOLD + msg + Colors.ENDC)
+        print_blue(msg, bold=True)
         msg = "Caso algum dos comandos acima não seja reconhecido, feche esse "
         msg += "terminal e abra novamente."
-        print_warning(Colors.BOLD + msg)
+        print_warning(msg, bold=True)
 
     def postgres_warning(self, local=True, trust=True):
         """
         Imprime na tela instruções de configuração do arquivo pg_hba.conf
         """
         print("{:#^80}".format("Atenção"))
-        msg = "Acrescente a(s) linha(s) que não está(ão) presente(s) no arquivo obedeça a ordem das linhas" + Colors.BOLD + " {}" + Colors.ENDC + Colors.WARNING + ":"
+        msg = "Acrescente a(s) linha(s) que não está(ão) presente(s) no "
+        msg += "arquivo obedeça a ordem das linhas" + Colors.BOLD + " {}"
+        msg += Colors.ENDC + Colors.WARNING + ":"
         msg = msg.format(self.pg_hba_path)
         print_warning(msg)
-        msg = Colors.BLUE + "host    all             postgres        127.0.0.1/32            trust"
+        msg = Colors.BLUE + "host    all             postgres        "
+        msg += "127.0.0.1/32            trust"
         if trust is True:
             msg += Colors.GREEN + Colors.BOLD + " (Está presente)"
         else:
             msg += Colors.FAIL + Colors.BOLD + " (Não está presente)"
         msg += Colors.ENDC
         print(msg)
-        msg = Colors.BLUE + "host    all             all             127.0.0.1/32            md5"
+        msg = Colors.BLUE + "host    all             all             "
+        msg += "127.0.0.1/32            md5"
         if local is True:
             msg += Colors.GREEN + Colors.BOLD + " (Está presente)"
         else:
@@ -792,8 +799,8 @@ class Prepdev():
         Mensagens importantes.
         """
         msg = Colors.WARNING
-        msg += "Você já configurou o postgresql para aceitar conexões do localhost"
-        msg += "(127.0.0.1) como confiáveis? (s/" + Colors.BOLD + "[N]"
+        msg += "Você já configurou o postgresql para aceitar conexões do "
+        msg += "localhost(127.0.0.1) como confiáveis? (s/" + Colors.BOLD + "[N]"
         msg += Colors.ENDC + Colors.WARNING + ")" + Colors.ENDC
         answer = input(msg)
         if answer == "":
@@ -802,6 +809,18 @@ class Prepdev():
             return True
         else:
             return False
+
+    def _valid_postgresql_minor_versions(self):
+        """
+        Retorna um inteiro representando a versão minor requerida.
+        """
+        return int(self.min_postgres_version.split(".")[1])
+
+    def _valid_postgresql_major_versions(self):
+        """
+        Retorna um inteiro representando a versão major requerida.
+        """
+        return int(self.min_postgres_version.split(".")[0])
 
     def set_postgresql_version(self):
         """
@@ -817,12 +836,15 @@ class Prepdev():
         versions = os.listdir(self.postgres_config_base_path)
         valid_versions = []
         if len(versions) > 1:
-            required_major_version = int(self.min_postgres_version.split(".")[0])
-            required_minor_version = int(self.min_postgres_version.split(".")[1])
+            required_major_version = self._valid_postgresql_major_versions()
+            required_minor_version = self._valid_postgresql_minor_versions()
+            # Verifica qual das versões instaladas é válida.
             for version in versions:
                 major = int(version.split(".")[0])
                 minor = int(version.split(".")[1])
-                if major >= required_major_version and minor >= required_minor_version:
+                conditions = [major >= required_major_version,
+                              minor >= required_minor_version]
+                if all(conditions):
                     valid_versions.append(version)
             if len(valid_versions) == 0:
                 msg = "Não foi encontrada uma versão válida do postgresql."
@@ -942,6 +964,7 @@ class Prepdev():
                     user = False
                     host = False
                     line = line.strip()
+                    required_hosts = ["127.0.0.1", "0.0.0.0", "127.0.0.1/32"]
                     if not line.startswith("#") and line.startswith("host"):
                         line = " ".join(line.split()).split()
                         if line[METHOD] == "trust":
@@ -949,7 +972,7 @@ class Prepdev():
                                 database = True
                             if line[USER] in ["postgres"]:
                                 user = True
-                            if line[HOST] in ["127.0.0.1", "0.0.0.0", "127.0.0.1/32"]:
+                            if line[HOST] in required_hosts:
                                 host = True
                             if all([database, user, host]):
                                 trust_access = True
@@ -958,7 +981,7 @@ class Prepdev():
                                 database = True
                             if line[USER] in ["all"]:
                                 user = True
-                            if line[HOST] in ["127.0.0.1", "0.0.0.0", "127.0.0.1/32"]:
+                            if line[HOST] in required_hosts:
                                 host = True
                             if all([database, user, host]):
                                 local_access = True
@@ -966,12 +989,18 @@ class Prepdev():
                 self.postgres_warning(local_access, trust_access)
                 sys.exit(-1)
 
+    def important_warning(self):
+        msg = "Este script não deve ser executado em ambiente de produção!"
+        print_warning(msg, bold=True)
+
     def run(self):
         if self.close_connections is True:
+            self.important_warning()
             self.close_db_connections()
         elif self.sigma_help is True:
             self.print_help()
         elif self.resetdb is True:
+            self.important_warning()
             self.configure_postgresql()
             self.set_instalation_path()
             self.check_postgresql_version()
@@ -980,6 +1009,7 @@ class Prepdev():
             self.run_migrations()
             self.populate_db()
         else:
+            self.important_warning()
             self.configure_postgresql()
             self.set_instalation_path()
             self.check_postgresql_version()
@@ -1053,24 +1083,39 @@ def get_file_group(filepath):
     group = grp.getgrgid(gid)[0]
     return group
 
-def print_info(msg, end="\n"):
-    print(Colors.GREEN + msg + Colors.ENDC, end=end)
+def print_info(msg, end="\n", bold=False):
+    if bold is True:
+        print(Colors.BOLD + Colors.GREEN + msg + Colors.ENDC, end=end)
+    else:
+        print(Colors.GREEN + msg + Colors.ENDC, end=end)
 
 
-def print_warning(msg, end="\n"):
-    print(Colors.WARNING + msg + Colors.ENDC, end=end)
+def print_warning(msg, end="\n", bold=False):
+    if bold is True:
+        print(Colors.BOLD + Colors.WARNING + msg + Colors.ENDC, end=end)
+    else:
+        print(Colors.WARNING + msg + Colors.ENDC, end=end)
 
 
-def print_blue(msg, end="\n"):
-    print(Colors.BLUE + msg + Colors.ENDC, end=end)
+def print_blue(msg, end="\n", bold=False):
+    if bold is True:
+        print(Colors.BOLD + Colors.BLUE + msg + Colors.ENDC, end=end)
+    else:
+        print(Colors.BLUE + msg + Colors.ENDC, end=end)
 
 
-def print_red(msg, end="\n"):
-    print(Colors.FAIL + msg + Colors.ENDC, end=end)
+def print_red(msg, end="\n", bold=False):
+    if bold is True:
+        print(Colors.BOLD + Colors.FAIL + msg + Colors.ENDC, end=end)
+    else:
+        print(Colors.FAIL + msg + Colors.ENDC, end=end)
 
 
-def print_error(msg, end="\n"):
-    print_red(msg, end=end)
+def print_error(msg, end="\n", bold=False):
+    if bold is True:
+        print_red(msg, end=end, bold=True)
+    else:
+        print_red(msg, end=end)
 
 
 def call(command, print_output=False):
@@ -1097,32 +1142,38 @@ def configure_parseargs():
     description = "Prepara o ambiente de desenvolvimento para os projetos "
     description += "sigma e sigmalib."
     parser = argparse.ArgumentParser(description=description)
+    help_text = "Executar somente o reset do banco de dados."
     parser.add_argument('--resetdb',
                         '-r',
                         dest='resetdb',
                         action='store_true',
-                        help="Executar somente o reset do banco de dados.")
+                        help=help_text)
+    help_text = "Não pedir confirmação para excluir o banco de dados."
     parser.add_argument('--excludedb',
                         '-e',
                         dest='excludedb',
                         action='store_true',
-                        help="Não pedir confirmação para excluir o banco de dados.")
+                        help=help_text)
+    help_text = "Executar somente o fechamento das conexões com o banco de "
+    help_text += "dados."
     parser.add_argument('--close-connections',
                         '-c',
                         dest='close_connections',
                         action='store_true',
-                        help="Executar somente o fechamento das conexões com o banco de dados.")
+                        help=help_text)
+    help_text = "Local do repositório de código."
     parser.add_argument('--repository-path',
                         '-p',
                         dest='repository_path',
                         type=str,
                         default="",
                         action='store',
-                        help="Local do repositório de código.")
+                        help=help_text)
+    help_text = "Imprime a ajuda rápida dos comandos personalizados."
     parser.add_argument('--sigma-help',
                         dest='sigma_help',
                         action='store_true',
-                        help="Imprime a ajuda rápida dos comandos personalizados.")
+                        help=help_text)
     return parser.parse_args()
 
 if __name__ == "__main__":
