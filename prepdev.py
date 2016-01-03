@@ -1019,6 +1019,14 @@ class Prepdev():
         msg = "Este script não deve ser executado em ambiente de produção!"
         print_warning(msg, bold=True)
 
+    def local_repo_exists(self):
+        """
+        Verifica se os repositórios locais(sigma e sigmalib) existem.
+        """
+        exist = os.path.exists(self.sigma_path)
+        exist = exist and os.path.exists(self.sigmalib_path)
+        return exist
+
     def run(self):
         if self.close_connections is True:
             self.important_warning()
@@ -1041,9 +1049,10 @@ class Prepdev():
             self.check_postgresql_version()
             self.create_venv()
             self.search_dependencies()
-            self.create_ssh_keys()
-            self.create_ssh_config()
-            self.github_configured()
+            if self.local_repo_exists() is False:
+                self.create_ssh_keys()
+                self.create_ssh_config()
+                self.github_configured()
             self.so_dependencies()
             self.clone_sigma()
             self.clone_sigmalib()
